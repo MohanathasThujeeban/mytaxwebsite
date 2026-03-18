@@ -35,7 +35,14 @@
 }
 
 html, body {
-  background: var(--black);
+  background-color: var(--black);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.78)),
+    url('/images/bgimage.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--silver);
   font-family: var(--font);
   min-height: 100vh;
@@ -1271,6 +1278,7 @@ button { cursor: pointer; }
 }
 
 @media (max-width: 640px) {
+  html, body { background-attachment: scroll; }
   .hero__title { font-size: 38px; }
   .hero__tagline { font-size: 16px; }
   .footer__grid { grid-template-columns: 1fr; gap: 32px; }
