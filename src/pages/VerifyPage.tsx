@@ -4,6 +4,7 @@ import { Smartphone, Mail, CreditCard, Send } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import OtpInput from '../components/OtpInput';
+import { api } from '../utils/api';
 
 type VerifyMethod = 'phone' | 'email';
 
@@ -12,7 +13,7 @@ const VerifyPage: React.FC = () => {
   const { verification, updateVerification } = useAuth();
   const navigate = useNavigate();
 
-  const [method, setMethod] = useState<VerifyMethod>('phone');
+  const [method, setMethod] = useState<VerifyMethod>('email');
   const [nic, setNic] = useState(verification.nic);
   const [mobile, setMobile] = useState(verification.mobile);
   const [email, setEmail] = useState('');
@@ -22,6 +23,8 @@ const VerifyPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [snack, setSnack] = useState('');
   const [countdown, setCountdown] = useState(0);
+
+  const [apiError, setApiError] = useState('');
 
   const showSnack = (msg: string) => {
     setSnack(msg);
@@ -46,20 +49,30 @@ const VerifyPage: React.FC = () => {
   };
 
   const handleSendOtp = () => {
+    setApiError('');
     const contact = method === 'phone' ? mobile : email;
-    if (!nic.trim() || !contact.trim()) {
+    if (!nic.trim() || !email.trim()) {
       showSnack(s['fillAllFields']);
       return;
     }
     setLoading(true);
-    // Simulate OTP send (replace with real API call)
-    setTimeout(() => {
-      setLoading(false);
-      setOtpSent(true);
-      updateVerification({ nic, mobile: method === 'phone' ? mobile : email, isOtpSent: true });
-      startCountdown();
-      showSnack(`OTP sent to ${contact}`);
-    }, 1200);
+    api.requestOtp({ nic, phone: method === 'phone' ? mobile : undefined, email })
+      .then(res => {
+        setLoading(false);
+        setOtpSent(true);
+        updateVerification({
+          nic,
+          mobile: method === 'phone' ? mobile : verification.mobile,
+          isOtpSent: true,
+          token: null,
+        });
+        startCountdown();
+        showSnack(res.message || `OTP sent to ${contact}`);
+      })
+      .catch(err => {
+        setLoading(false);
+        setApiError(err.message || 'Failed to send OTP');
+      });
   };
 
   const handleVerifyOtp = () => {
@@ -69,12 +82,17 @@ const VerifyPage: React.FC = () => {
       return;
     }
     setLoading(true);
-    // Simulate OTP verification (replace with real API call — accept any 6 digits for demo)
-    setTimeout(() => {
-      setLoading(false);
-      setVerified(true);
-      updateVerification({ isVerified: true });
-    }, 1000);
+    api.verifyOtpWithEmail({ nic, email, code: otpStr })
+      .then(res => {
+        setLoading(false);
+        setVerified(true);
+        updateVerification({ isVerified: true, token: res.token, nic, mobile, });
+        showSnack(res.message || 'Verified');
+      })
+      .catch(err => {
+        setLoading(false);
+        setApiError(err.message || 'Invalid OTP');
+      });
   };
 
   const handleResend = () => {
@@ -183,15 +201,20 @@ const VerifyPage: React.FC = () => {
               {s['noteBody']}
             </div>
 
-            {/* Send OTP button */}
+            {/* Send OTP or verify */}
             {!otpSent ? (
-              <button
-                className="btn-primary btn-full"
-                onClick={handleSendOtp}
-                disabled={loading}
-              >
-                {loading ? <span className="spinner" /> : <Send size={15} style={{ marginRight: 6, verticalAlign: 'middle' }} />} {s['sendOtp']}
-              </button>
+              <>
+                <button
+                  className="btn-primary btn-full"
+                  onClick={handleSendOtp}
+                  disabled={loading}
+                >
+                  {loading ? <span className="spinner" /> : <Send size={15} style={{ marginRight: 6, verticalAlign: 'middle' }} />} {s['sendOtp']}
+                </button>
+                {apiError && (
+                  <p style={{ color: '#ff9a9a', marginTop: '12px', fontSize: '12px', textAlign: 'center' }}>{apiError}</p>
+                )}
+              </>
             ) : (
               <>
                 {/* ── Step 2: OTP ── */}
@@ -230,11 +253,14 @@ const VerifyPage: React.FC = () => {
                   </button>
                   <button
                     className="passkey-link"
-                    onClick={() => { setOtpSent(false); setOtp(Array(6).fill('')); }}
+                    onClick={() => { setOtpSent(false); setOtp(Array(6).fill('')); setApiError(''); }}
                   >
                     ✎ {method === 'phone' ? 'Change number' : 'Change email'}
                   </button>
                 </div>
+                {apiError && (
+                  <p style={{ color: '#ff9a9a', marginTop: '12px', fontSize: '12px' }}>{apiError}</p>
+                )}
               </>
             )}
           </>

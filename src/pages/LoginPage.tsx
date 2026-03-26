@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CreditCard, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../utils/api';
 
 const LoginPage: React.FC = () => {
   const { s } = useLanguage();
@@ -14,6 +15,7 @@ const LoginPage: React.FC = () => {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [snack, setSnack] = useState('');
+  const [apiError, setApiError] = useState('');
 
   const showSnack = (msg: string) => {
     setSnack(msg);
@@ -26,19 +28,27 @@ const LoginPage: React.FC = () => {
       return;
     }
     setLoading(true);
-    // Simulate authentication (replace with real API call)
-    setTimeout(() => {
-      setLoading(false);
-      login({
-        nic,
-        name: 'Tax Payer',      // Will come from API
-        clientCode: 'MX-' + Math.floor(1000 + Math.random() * 9000),
-        tinNumber: '',
-        contactNo: verification.mobile,
-        mailAddress: '',
-      });
-      navigate('/dashboard');
-    }, 1200);
+    api.login({ nic, password })
+      .then(res => {
+        const u = res.user as Record<string, unknown>;
+        login({
+          nic: (u.nic as string) || nic,
+          fullName: u.fullName as string,
+          contactNo: (u.phone as string) || verification.mobile,
+          mailAddress: u.email as string,
+          district: u.district as string,
+          dsDivision: u.dsDivision as string,
+          gsDivision: u.gsDivision as string,
+          postalNo: u.postalNo as string,
+          addressLine1: u.addressLine1 as string,
+          addressLine2: u.addressLine2 as string,
+        });
+        navigate('/dashboard');
+      })
+      .catch(err => {
+        setApiError(err.message || 'Login failed');
+      })
+      .finally(() => setLoading(false));
   };
 
   return (
@@ -159,6 +169,7 @@ const LoginPage: React.FC = () => {
       </div>
 
       {snack && <div className="snackbar">{snack}</div>}
+      {apiError && <div className="snackbar" style={{ background: '#552222' }}>{apiError}</div>}
     </div>
   );
 };

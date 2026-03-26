@@ -5,15 +5,20 @@ interface VerificationState {
   mobile: string;
   isOtpSent: boolean;
   isVerified: boolean;
+  token: string | null;
 }
 
 export interface UserInfo {
   nic: string;
-  name: string;
-  clientCode: string;
-  tinNumber: string;
-  contactNo: string;
-  mailAddress: string;
+  fullName?: string;
+  contactNo?: string;
+  mailAddress?: string;
+  district?: string;
+  dsDivision?: string;
+  gsDivision?: string;
+  postalNo?: string;
+  addressLine1?: string;
+  addressLine2?: string;
 }
 
 interface AuthContextType {
@@ -37,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     mobile: '',
     isOtpSent: false,
     isVerified: false,
+    token: null,
   });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -52,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = () => {
     setUser(null);
     setIsLoggedIn(false);
-    setVerification({ nic: '', mobile: '', isOtpSent: false, isVerified: false });
+    setVerification({ nic: '', mobile: '', isOtpSent: false, isVerified: false, token: null });
   };
 
   return (

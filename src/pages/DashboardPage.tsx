@@ -14,15 +14,15 @@ const DashboardPage: React.FC = () => {
     return null;
   }
 
-  const firstName = user.name?.split(' ')[0] ?? 'User';
+  const firstName = user.fullName?.split(' ')[0] || 'User';
 
   const clientRows = [
-    { label: s['clientCode'],  value: user.clientCode  || '—' },
-    { label: s['clientName'],  value: user.name        || '—' },
-    { label: 'NIC:',           value: user.nic         || '—' },
-    { label: s['tinNumber'],   value: user.tinNumber   || 'Pending' },
-    { label: s['contactNo'],   value: user.contactNo   || '—' },
+    { label: s['clientName'] || 'Client Name', value: user.fullName || '—' },
+    { label: 'NIC:', value: user.nic || '—' },
+    { label: s['contactNo'], value: user.contactNo || '—' },
     { label: s['mailAddress'], value: user.mailAddress || '—' },
+    { label: s['district'] || 'District', value: user.district || '—' },
+    { label: s['postalAddress'] || 'Address', value: user.addressLine1 || '—' },
   ];
 
   const handleLogout = () => {

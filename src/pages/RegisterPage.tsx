@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, CreditCard, Pen, Smartphone, Mail, MapPin, Map, Home, Shield, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../utils/api';
 
 const SRI_LANKA_DISTRICTS = [
   'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo',
@@ -76,6 +77,7 @@ const RegisterPage: React.FC = () => {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [snack, setSnack] = useState('');
+  const [apiError, setApiError] = useState('');
 
   const set = (key: keyof FormData) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -87,6 +89,7 @@ const RegisterPage: React.FC = () => {
   };
 
   const handleSubmit = () => {
+    setApiError('');
     if (
       !form.fullName.trim() ||
       !form.mobileNo.trim() ||
@@ -97,19 +100,41 @@ const RegisterPage: React.FC = () => {
       return;
     }
     setLoading(true);
-    // Simulate registration (replace with real API call)
-    setTimeout(() => {
-      setLoading(false);
-      login({
-        nic: verification.nic,
-        name: form.fullName,
-        clientCode: 'MX-' + Math.floor(1000 + Math.random() * 9000),
-        tinNumber: '',
-        contactNo: form.mobileNo,
-        mailAddress: form.emailAddress,
+    api.register({
+      nic: verification.nic,
+      fullName: form.fullName,
+      mobileNo: form.mobileNo,
+      emailAddress: form.emailAddress,
+      district: form.district,
+      dsDivision: form.dsDivision,
+      gsDivision: form.gsDivision,
+      postalNo: form.postalNo,
+      addressLine1: form.addLine1,
+      addressLine2: form.addLine2,
+      password: form.password,
+    })
+      .then(res => {
+        setLoading(false);
+        const u = res.user as Record<string, unknown>;
+        login({
+          nic: (u.nic as string) || verification.nic,
+          fullName: (u.fullName as string) || form.fullName,
+          contactNo: (u.phone as string) || form.mobileNo,
+          mailAddress: (u.email as string) || form.emailAddress,
+          district: (u.district as string) || form.district,
+          dsDivision: (u.dsDivision as string) || form.dsDivision,
+          gsDivision: (u.gsDivision as string) || form.gsDivision,
+          postalNo: (u.postalNo as string) || form.postalNo,
+          addressLine1: (u.addressLine1 as string) || form.addLine1,
+          addressLine2: (u.addressLine2 as string) || form.addLine2,
+        });
+        showSnack(res.message || 'Registered');
+        navigate('/dashboard');
+      })
+      .catch(err => {
+        setLoading(false);
+        setApiError(err.message || 'Registration failed');
       });
-      navigate('/dashboard');
-    }, 1400);
   };
 
   const inputStyle: React.CSSProperties = {};
@@ -336,6 +361,10 @@ const RegisterPage: React.FC = () => {
         >
           {loading ? <span className="spinner" /> : '✓'} {s['verifyAndCreate']}
         </button>
+
+        {apiError && (
+          <p style={{ color: '#ff9a9a', marginTop: '12px', fontSize: '12px', textAlign: 'center' }}>{apiError}</p>
+        )}
 
         <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '12px', color: 'rgba(184,184,184,0.4)' }}>
           Already have an account?{' '}
