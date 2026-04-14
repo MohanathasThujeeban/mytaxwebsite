@@ -30,6 +30,13 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     api.login({ nic, password })
       .then(res => {
+        if (res.role === 'admin') {
+          sessionStorage.setItem('mytax_admin_token', res.token);
+          navigate('/admin/dashboard');
+          return;
+        }
+
+        sessionStorage.removeItem('mytax_admin_token');
         const u = res.user as Record<string, unknown>;
         login({
           nic: (u.nic as string) || nic,
@@ -75,15 +82,15 @@ const LoginPage: React.FC = () => {
       {/* Form card */}
       <div className="auth-form animate-in" style={{ paddingTop: '0' }}>
         <div className="section-card">
-          {/* NIC field */}
+          {/* Username / NIC field */}
           <div style={{ marginBottom: '20px' }}>
             <div className="field-label">
-              <CreditCard size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> {s['nicNumber']}
+              <CreditCard size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Username / NIC
             </div>
             <div className="input-wrapper">
               <input
                 type="text"
-                placeholder="e.g. 922162719V"
+                placeholder="e.g. admin@matrix.com or 922162719V"
                 value={nic}
                 onChange={e => setNic(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}

@@ -50,20 +50,44 @@ const VerifyPage: React.FC = () => {
 
   const handleSendOtp = () => {
     setApiError('');
-    const contact = method === 'phone' ? mobile : email;
-    if (!nic.trim() || !email.trim()) {
+    const trimmedNic = nic.trim();
+    const trimmedMobile = mobile.trim();
+    const trimmedEmail = email.trim();
+    const contact = method === 'phone' ? trimmedMobile : trimmedEmail;
+
+    if (!trimmedNic || (method === 'phone' ? !trimmedMobile : !trimmedEmail)) {
       showSnack(s['fillAllFields']);
       return;
     }
+
     setLoading(true);
-    api.requestOtp({ nic, phone: method === 'phone' ? mobile : undefined, email })
+    api.requestOtp({
+      nic: trimmedNic,
+      phone: method === 'phone' ? trimmedMobile : undefined,
+      email: method === 'email' ? trimmedEmail : undefined,
+    })
       .then(res => {
         setLoading(false);
+
+        if (res.channel === 'bypass') {
+          updateVerification({
+            nic: trimmedNic,
+            mobile: trimmedMobile,
+            isOtpSent: false,
+            isVerified: true,
+            token: res.token ?? null,
+          });
+          showSnack(res.message || 'Default account verified. Continue to login.');
+          navigate('/login');
+          return;
+        }
+
         setOtpSent(true);
         updateVerification({
-          nic,
-          mobile: method === 'phone' ? mobile : verification.mobile,
+          nic: trimmedNic,
+          mobile: method === 'phone' ? trimmedMobile : verification.mobile,
           isOtpSent: true,
+          isVerified: false,
           token: null,
         });
         startCountdown();
@@ -81,12 +105,27 @@ const VerifyPage: React.FC = () => {
       showSnack(s['enterCompleteOtp']);
       return;
     }
+
+    const trimmedNic = nic.trim();
+    const trimmedEmail = email.trim();
+    const trimmedMobile = mobile.trim();
+
     setLoading(true);
-    api.verifyOtpWithEmail({ nic, email, code: otpStr })
+    api.verifyOtp({
+      nic: trimmedNic,
+      email: method === 'email' ? trimmedEmail : undefined,
+      code: otpStr,
+    })
       .then(res => {
         setLoading(false);
         setVerified(true);
-        updateVerification({ isVerified: true, token: res.token, nic, mobile, });
+        updateVerification({
+          isVerified: true,
+          token: res.token,
+          nic: trimmedNic,
+          mobile: trimmedMobile,
+          isOtpSent: true,
+        });
         showSnack(res.message || 'Verified');
       })
       .catch(err => {
