@@ -50,7 +50,7 @@ const LoginPage: React.FC = () => {
           addressLine1: u.addressLine1 as string,
           addressLine2: u.addressLine2 as string,
         });
-        navigate('/dashboard');
+        navigate('/dashboard/modules');
       })
       .catch(err => {
         setApiError(err.message || 'Login failed');

@@ -48,11 +48,13 @@ const Header: React.FC = () => {
 
   const handleSignIn = () => {
     if (isLoggedIn) {
-      navigate('/dashboard');
+      navigate('/dashboard/modules');
     } else {
       navigate('/verify');
     }
   };
+
+  const dashboardPath = '/dashboard/modules';
 
   const currentLang = LANGUAGES.find(l => l.code === language)!;
 
@@ -149,7 +151,7 @@ const Header: React.FC = () => {
         {/* Sign In / Dashboard / Logout */}
         {isLoggedIn ? (
           <>
-            <button className="btn-outline" style={{ padding: '8px 18px', fontSize: '13px' }} onClick={() => navigate('/dashboard')}>
+            <button className="btn-outline" style={{ padding: '8px 18px', fontSize: '13px' }} onClick={() => navigate(dashboardPath)}>
               Dashboard
             </button>
             <button className="btn-outline" style={{ padding: '8px 18px', fontSize: '13px' }} onClick={logout}>

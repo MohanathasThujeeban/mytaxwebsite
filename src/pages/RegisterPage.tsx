@@ -129,7 +129,7 @@ const RegisterPage: React.FC = () => {
           addressLine2: (u.addressLine2 as string) || form.addLine2,
         });
         showSnack(res.message || 'Registered');
-        navigate('/dashboard');
+        navigate('/dashboard/modules');
       })
       .catch(err => {
         setLoading(false);

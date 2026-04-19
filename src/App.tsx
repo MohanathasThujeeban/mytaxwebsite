@@ -9,6 +9,8 @@ import VerifyPage from './pages/VerifyPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
+import PostLoginModulesPage from './pages/PostLoginModulesPage';
+import M1TaxSubmissionPage from './pages/M1TaxSubmissionPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AboutPage from './pages/AboutPage';
 import GroupCompaniesPage from './pages/GroupCompaniesPage';
@@ -30,7 +32,9 @@ const AppInner: React.FC = () => {
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/dashboard/modules" element={<PostLoginModulesPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/dashboard/m1" element={<M1TaxSubmissionPage />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/group" element={<GroupCompaniesPage />} />

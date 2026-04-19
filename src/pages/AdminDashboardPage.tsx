@@ -1,7 +1,33 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, RefreshCw, ShieldCheck, Users } from 'lucide-react';
+import {
+  BarChart3,
+  CheckCircle2,
+  Download,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  LogOut,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Users,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { api } from '../utils/api';
+import {
+  DocumentVerificationStatus,
+  M1SubmissionRecord,
+  downloadM1SubmissionsCsv,
+  downloadM1SubmissionsExcel,
+  formatIncomeLabel,
+  getAllM1Submissions,
+  getSubmissionDocuments,
+  getSubmissionVerificationSummary,
+  getUploadSummary,
+  setSubmissionDocumentVerification,
+} from '../utils/taxSubmission';
 
 interface AdminUser {
   id: string;
@@ -16,7 +42,6 @@ interface AdminUser {
   addressLine1: string;
   addressLine2: string;
   createdAt: Date | null;
-  updatedAt: Date | null;
 }
 
 const asString = (value: unknown): string => (typeof value === 'string' ? value : '');
@@ -42,34 +67,56 @@ const toUser = (raw: Record<string, unknown>): AdminUser => ({
   addressLine1: asString(raw.addressLine1),
   addressLine2: asString(raw.addressLine2),
   createdAt: asDate(raw.createdAt),
-  updatedAt: asDate(raw.updatedAt),
 });
 
-const formatDate = (date: Date | null): string => {
+const formatDate = (date: Date | string | null): string => {
   if (!date) {
     return '-';
   }
-  const two = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
+
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(dateObj.getTime())) {
+    return '-';
+  }
+
+  return dateObj.toLocaleString();
 };
 
 const display = (value: string): string => (value.trim() ? value : '-');
+const nicKey = (value: string): string => value.trim().toLowerCase();
+
+const hasFileExt = (fileName: string | undefined, extensions: string[]): boolean => {
+  const normalized = (fileName || '').toLowerCase();
+  return extensions.some(ext => normalized.endsWith(`.${ext}`));
+};
+
+const isImageDoc = (fileType: string | undefined, fileName: string | undefined): boolean =>
+  Boolean(fileType?.startsWith('image/')) || hasFileExt(fileName, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
+
+const isPdfDoc = (fileType: string | undefined, fileName: string | undefined): boolean =>
+  Boolean(fileType?.includes('pdf')) || hasFileExt(fileName, ['pdf']);
+
+const statusClass = (status: 'draft' | 'submitted'): string =>
+  status === 'submitted' ? 'm1-status-chip success' : 'm1-status-chip warning';
+
+type AdminView = 'users' | 'm1';
 
 const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
+  const [activeView, setActiveView] = useState<AdminView>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [submissions, setSubmissions] = useState<M1SubmissionRecord[]>([]);
+  const [userQuery, setUserQuery] = useState('');
+  const [m1Query, setM1Query] = useState('');
+  const [selectedUserNic, setSelectedUserNic] = useState('');
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState('');
+  const [selectedDocumentKey, setSelectedDocumentKey] = useState('');
+  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
 
-  const selectedUser = useMemo(() => {
-    if (!users.length) {
-      return null;
-    }
-    return users.find(user => user.id === selectedUserId) ?? users[0];
-  }, [users, selectedUserId]);
-
-  const loadUsers = () => {
+  const loadDashboard = () => {
     const token = sessionStorage.getItem('mytax_admin_token');
     if (!token) {
       navigate('/login');
@@ -78,155 +125,972 @@ const AdminDashboardPage: React.FC = () => {
 
     setLoading(true);
     setError('');
+    setWarning('');
+
+    const localSubmissions = getAllM1Submissions();
+    setSubmissions(localSubmissions);
+    if (localSubmissions.length) {
+      setSelectedSubmissionId(prev => prev || localSubmissions[0].id);
+    }
 
     api.adminUsers(token)
       .then(res => {
-        const list = Array.isArray(res.users)
-          ? res.users.map(item => toUser(item))
-          : [];
+        const list = Array.isArray(res.users) ? res.users.map(item => toUser(item)) : [];
         setUsers(list);
         if (list.length) {
-          setSelectedUserId(prev => prev || list[0].id);
+          setSelectedUserNic(prev => prev || list[0].nic);
         }
       })
       .catch(err => {
-        setError(err?.message || 'Failed to load users');
+        setWarning(err?.message || 'Unable to load registered users from backend.');
       })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    loadUsers();
+    loadDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const submissionsByNic = useMemo(() => {
+    const bucket = new Map<string, M1SubmissionRecord[]>();
+
+    submissions.forEach(item => {
+      const key = nicKey(item.userProfile.nic);
+      if (!key) {
+        return;
+      }
+
+      const list = bucket.get(key);
+      if (list) {
+        list.push(item);
+      } else {
+        bucket.set(key, [item]);
+      }
+    });
+
+    return bucket;
+  }, [submissions]);
+
+  const filteredUsers = useMemo(() => {
+    const q = userQuery.trim().toLowerCase();
+    if (!q) {
+      return users;
+    }
+
+    return users.filter(item => {
+      const nic = item.nic.toLowerCase();
+      const fullName = item.fullName.toLowerCase();
+      const phone = item.phone.toLowerCase();
+      const email = item.email.toLowerCase();
+      const district = item.district.toLowerCase();
+
+      return (
+        nic.includes(q) ||
+        fullName.includes(q) ||
+        phone.includes(q) ||
+        email.includes(q) ||
+        district.includes(q)
+      );
+    });
+  }, [userQuery, users]);
+
+  const selectedRegistryUser = useMemo(() => {
+    if (!filteredUsers.length) {
+      return null;
+    }
+
+    return filteredUsers.find(item => nicKey(item.nic) === nicKey(selectedUserNic)) || filteredUsers[0];
+  }, [filteredUsers, selectedUserNic]);
+
+  useEffect(() => {
+    if (selectedRegistryUser && selectedRegistryUser.nic !== selectedUserNic) {
+      setSelectedUserNic(selectedRegistryUser.nic);
+    }
+  }, [selectedRegistryUser, selectedUserNic]);
+
+  const filteredSubmissions = useMemo(() => {
+    const q = m1Query.trim().toLowerCase();
+    if (!q) {
+      return submissions;
+    }
+
+    return submissions.filter(item => {
+      const fullName = item.userProfile.fullName?.toLowerCase() || '';
+      const nic = item.userProfile.nic.toLowerCase();
+      const contact = item.userProfile.contactNo?.toLowerCase() || '';
+      return fullName.includes(q) || nic.includes(q) || contact.includes(q);
+    });
+  }, [m1Query, submissions]);
+
+  const selectedSubmission = useMemo(() => {
+    if (!filteredSubmissions.length) {
+      return null;
+    }
+
+    return filteredSubmissions.find(item => item.id === selectedSubmissionId) || filteredSubmissions[0];
+  }, [filteredSubmissions, selectedSubmissionId]);
+
+  useEffect(() => {
+    if (selectedSubmission && selectedSubmission.id !== selectedSubmissionId) {
+      setSelectedSubmissionId(selectedSubmission.id);
+    }
+  }, [selectedSubmission, selectedSubmissionId]);
+
+  const selectedSubmissionDocuments = useMemo(() => {
+    if (!selectedSubmission) {
+      return [];
+    }
+
+    return getSubmissionDocuments(selectedSubmission);
+  }, [selectedSubmission]);
+
+  const selectedUploadedDocuments = useMemo(
+    () => selectedSubmissionDocuments.filter(item => item.doc.mode === 'uploaded'),
+    [selectedSubmissionDocuments]
+  );
+
+  const selectedDocument = useMemo(() => {
+    return selectedUploadedDocuments.find(item => item.key === selectedDocumentKey) || null;
+  }, [selectedDocumentKey, selectedUploadedDocuments]);
+
+  const selectedDocumentPreviewType = useMemo(() => {
+    if (!selectedDocument) {
+      return 'none' as const;
+    }
+
+    if (isImageDoc(selectedDocument.doc.fileType, selectedDocument.doc.fileName)) {
+      return 'image' as const;
+    }
+
+    if (isPdfDoc(selectedDocument.doc.fileType, selectedDocument.doc.fileName)) {
+      return 'pdf' as const;
+    }
+
+    return 'other' as const;
+  }, [selectedDocument]);
+
+  useEffect(() => {
+    if (selectedDocumentKey && !selectedUploadedDocuments.some(item => item.key === selectedDocumentKey)) {
+      setSelectedDocumentKey('');
+      setIsDocumentDialogOpen(false);
+    }
+  }, [selectedDocumentKey, selectedUploadedDocuments]);
+
+  const selectedDocumentVerificationSummary = useMemo(() => {
+    if (!selectedSubmission) {
+      return { uploaded: 0, verified: 0, rejected: 0, pending: 0 };
+    }
+
+    return getSubmissionVerificationSummary(selectedSubmission);
+  }, [selectedSubmission]);
+
+  const selectedSubmissionUser = useMemo(() => {
+    if (!selectedSubmission) {
+      return null;
+    }
+
+    const nic = nicKey(selectedSubmission.userProfile.nic);
+    return users.find(item => nicKey(item.nic) === nic) || null;
+  }, [selectedSubmission, users]);
+
+  const selectedRegistryUserSubmissions = useMemo(() => {
+    if (!selectedRegistryUser) {
+      return [] as M1SubmissionRecord[];
+    }
+
+    return submissionsByNic.get(nicKey(selectedRegistryUser.nic)) || [];
+  }, [selectedRegistryUser, submissionsByNic]);
+
+  const selectedRegistryLatestSubmission = selectedRegistryUserSubmissions[0] || null;
+  const selectedRegistryLatestUploadSummary = selectedRegistryLatestSubmission
+    ? getUploadSummary(selectedRegistryLatestSubmission.form)
+    : null;
+
+  const selectedRegistrySubmissionMetrics = useMemo(() => {
+    const total = selectedRegistryUserSubmissions.length;
+    const submitted = selectedRegistryUserSubmissions.filter(item => item.status === 'submitted').length;
+    const draft = selectedRegistryUserSubmissions.filter(item => item.status === 'draft').length;
+
+    return { total, submitted, draft };
+  }, [selectedRegistryUserSubmissions]);
+
+  const metrics = useMemo(() => {
+    const total = submissions.length;
+    const submitted = submissions.filter(item => item.status === 'submitted').length;
+    const draft = submissions.filter(item => item.status === 'draft').length;
+    const completion = total ? Math.round((submitted / total) * 100) : 0;
+
+    return { total, submitted, draft, completion };
+  }, [submissions]);
+
+  const m1UserCount = useMemo(() => submissionsByNic.size, [submissionsByNic]);
+
+  const usersWithRequests = useMemo(
+    () => users.filter(item => (submissionsByNic.get(nicKey(item.nic)) || []).length > 0).length,
+    [submissionsByNic, users]
+  );
+
+  const usersWithoutRequests = Math.max(users.length - usersWithRequests, 0);
 
   const handleLogout = () => {
     sessionStorage.removeItem('mytax_admin_token');
     navigate('/login');
   };
 
+  const handleExportCsv = () => {
+    if (!submissions.length) {
+      setError('No submissions available to export.');
+      return;
+    }
+
+    setError('');
+    downloadM1SubmissionsCsv(submissions);
+  };
+
+  const handleExportExcel = () => {
+    if (!submissions.length) {
+      setError('No submissions available to export.');
+      return;
+    }
+
+    setError('');
+    downloadM1SubmissionsExcel(submissions);
+  };
+
+  const handleDocumentVerification = (documentKey: string, verificationStatus: DocumentVerificationStatus) => {
+    if (!selectedSubmission) {
+      return;
+    }
+
+    const updatedRecord = setSubmissionDocumentVerification(selectedSubmission.id, documentKey, verificationStatus);
+    if (!updatedRecord) {
+      setError('Unable to update document verification status.');
+      return;
+    }
+
+    setError('');
+    setSubmissions(prev => prev.map(item => (item.id === updatedRecord.id ? updatedRecord : item)));
+    setWarning(
+      `${updatedRecord.userProfile.nic} - document marked as ${verificationStatus}.`
+    );
+  };
+
+  const openDocumentDialog = (documentKey: string) => {
+    setSelectedDocumentKey(documentKey);
+    setIsDocumentDialogOpen(true);
+  };
+
+  const closeDocumentDialog = () => {
+    setIsDocumentDialogOpen(false);
+  };
+
+  const uploadSummary = selectedSubmission ? getUploadSummary(selectedSubmission.form) : null;
+
+  const submissionRows = useMemo(() => {
+    if (!selectedSubmission) {
+      return [] as Array<{ label: string; value: string }>;
+    }
+
+    return [
+      { label: 'Submission ID', value: selectedSubmission.id },
+      { label: 'Status', value: selectedSubmission.status },
+      { label: 'Submitted At', value: formatDate(selectedSubmission.submittedAt) },
+      { label: 'Updated At', value: formatDate(selectedSubmission.updatedAt) },
+      { label: 'Client Name', value: display(selectedSubmission.userProfile.fullName || '') },
+      { label: 'NIC', value: display(selectedSubmission.userProfile.nic) },
+      { label: 'Contact', value: display(selectedSubmission.userProfile.contactNo || '') },
+      { label: 'Email', value: display(selectedSubmission.userProfile.mailAddress || '') },
+      { label: 'Income Types', value: formatIncomeLabel(selectedSubmission.form) },
+      { label: 'Residence Type', value: display(selectedSubmission.form.residenceType) },
+      { label: 'Business Bank', value: display(selectedSubmission.form.businessBankUse) },
+      { label: 'Assets Declared', value: display(selectedSubmission.form.assets.declareAssets) },
+      { label: 'Loans Declared', value: display(selectedSubmission.form.liabilities.hasLoans) },
+    ];
+  }, [selectedSubmission]);
+
+  const userRows = useMemo(() => {
+    if (!selectedRegistryUser) {
+      return [] as Array<{ label: string; value: string }>;
+    }
+
+    return [
+      { label: 'Full Name', value: display(selectedRegistryUser.fullName) },
+      { label: 'NIC', value: display(selectedRegistryUser.nic) },
+      { label: 'Phone', value: display(selectedRegistryUser.phone) },
+      { label: 'Email', value: display(selectedRegistryUser.email) },
+      { label: 'District', value: display(selectedRegistryUser.district) },
+      { label: 'DS Division', value: display(selectedRegistryUser.dsDivision) },
+      { label: 'GS Division', value: display(selectedRegistryUser.gsDivision) },
+      { label: 'Postal No', value: display(selectedRegistryUser.postalNo) },
+      { label: 'Address Line 1', value: display(selectedRegistryUser.addressLine1) },
+      { label: 'Address Line 2', value: display(selectedRegistryUser.addressLine2) },
+      { label: 'Registered At', value: formatDate(selectedRegistryUser.createdAt) },
+    ];
+  }, [selectedRegistryUser]);
+
+  const registryServiceRows = useMemo(() => {
+    return [
+      {
+        label: 'Requested Services',
+        value: selectedRegistryUserSubmissions.length ? 'M1 Tax File' : 'No requested service',
+      },
+      { label: 'M1 Requests', value: String(selectedRegistryUserSubmissions.length) },
+      {
+        label: 'Latest M1 Status',
+        value: selectedRegistryLatestSubmission ? selectedRegistryLatestSubmission.status : '-',
+      },
+      {
+        label: 'Latest M1 Progress',
+        value: selectedRegistryLatestSubmission ? `${selectedRegistryLatestSubmission.progress}%` : '-',
+      },
+      {
+        label: 'Latest M1 Update',
+        value: selectedRegistryLatestSubmission ? formatDate(selectedRegistryLatestSubmission.updatedAt) : '-',
+      },
+    ] as Array<{ label: string; value: string }>;
+  }, [selectedRegistryLatestSubmission, selectedRegistryUserSubmissions.length]);
+
+  const submissionUserRows = useMemo(() => {
+    if (!selectedSubmissionUser) {
+      return [] as Array<{ label: string; value: string }>;
+    }
+
+    return [
+      { label: 'Full Name', value: display(selectedSubmissionUser.fullName) },
+      { label: 'NIC', value: display(selectedSubmissionUser.nic) },
+      { label: 'Phone', value: display(selectedSubmissionUser.phone) },
+      { label: 'Email', value: display(selectedSubmissionUser.email) },
+      { label: 'District', value: display(selectedSubmissionUser.district) },
+      { label: 'Registered At', value: formatDate(selectedSubmissionUser.createdAt) },
+    ];
+  }, [selectedSubmissionUser]);
+
+  const recentRecords = useMemo(() => submissions.slice(0, 6), [submissions]);
+
+  const recentUsers = useMemo(() => {
+    return [...users]
+      .sort((a, b) => {
+        const left = a.createdAt ? a.createdAt.getTime() : 0;
+        const right = b.createdAt ? b.createdAt.getTime() : 0;
+        return right - left;
+      })
+      .slice(0, 6);
+  }, [users]);
+
   return (
     <div className="dashboard">
-      <div className="dashboard-header">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <p style={{ fontSize: '14px', letterSpacing: '2px', textTransform: 'uppercase', color: 'rgba(184,184,184,0.55)' }}>
-            Admin Panel
-          </p>
-          <p style={{ fontSize: '20px', fontWeight: 800, color: 'var(--silver)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShieldCheck size={20} /> MyTax Admin Dashboard
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button className="btn-outline" onClick={loadUsers}>
-            <RefreshCw size={14} style={{ marginRight: '6px' }} /> Refresh
-          </button>
-          <button className="btn-outline" onClick={handleLogout}>
-            <LogOut size={14} style={{ marginRight: '6px' }} /> Logout
-          </button>
-        </div>
-      </div>
-
-      <div className="dashboard-inner animate-in">
+      <div className="dashboard-inner dashboard-inner--admin animate-in">
         {loading ? (
-          <div className="admin-panel" style={{ minHeight: '220px', display: 'grid', placeItems: 'center' }}>
+          <div className="admin-card" style={{ minHeight: '300px', display: 'grid', placeItems: 'center' }}>
             <div className="spinner" />
           </div>
-        ) : error ? (
-          <div className="admin-panel" style={{ minHeight: '220px', display: 'grid', placeItems: 'center', color: '#ff9d9d' }}>
-            {error}
-          </div>
         ) : (
-          <div className="admin-layout">
-            <aside className="admin-panel">
-              <div className="admin-panel__title">
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <Users size={16} /> Users
-                </span>
-                <span className="admin-count-chip">{users.length} registered</span>
+          <div className="admin-shell">
+            <aside className="admin-rail">
+              <div className="admin-rail__brand">
+                <div className="admin-rail__brand-icon">
+                  <ShieldCheck size={18} />
+                </div>
+                <div className="admin-rail__brand-text">
+                  <p>Operations</p>
+                  <strong>MyTax Console</strong>
+                </div>
               </div>
 
-              {!users.length ? (
-                <p style={{ color: 'rgba(184,184,184,0.62)', marginTop: '8px' }}>No registered users found.</p>
-              ) : (
-                <div className="admin-user-list">
-                  {users.map(user => {
-                    const selected = selectedUser?.id === user.id;
-                    return (
-                      <button
-                        key={user.id}
-                        className={`admin-user-item${selected ? ' selected' : ''}`}
-                        onClick={() => setSelectedUserId(user.id)}
-                      >
-                        <div className="admin-user-item__name">{display(user.fullName)}</div>
-                        <div className="admin-user-item__meta">{display(user.nic)}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="admin-rail__menu">
+                <button
+                  type="button"
+                  className={`admin-rail__item${activeView === 'users' ? ' active' : ''}`}
+                  onClick={() => setActiveView('users')}
+                >
+                  <Users size={15} /> Users
+                </button>
+                <button
+                  type="button"
+                  className={`admin-rail__item${activeView === 'm1' ? ' active' : ''}`}
+                  onClick={() => setActiveView('m1')}
+                >
+                  <FileText size={15} /> M1
+                </button>
+              </div>
+
+              <button className="admin-rail__logout" onClick={handleLogout}>
+                <LogOut size={15} /> Logout
+              </button>
             </aside>
 
-            <section className="admin-panel">
-              <div className="admin-panel__title">User Details</div>
-              {selectedUser ? (
-                <div className="admin-detail-box">
-                  <div className="admin-detail-row">
-                    <span>Full Name</span>
-                    <strong>{display(selectedUser.fullName)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>NIC</span>
-                    <strong>{display(selectedUser.nic)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>Phone Number</span>
-                    <strong>{display(selectedUser.phone)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>Email Address</span>
-                    <strong>{display(selectedUser.email)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>District</span>
-                    <strong>{display(selectedUser.district)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>DS Division</span>
-                    <strong>{display(selectedUser.dsDivision)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>GS Division</span>
-                    <strong>{display(selectedUser.gsDivision)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>Postal No</span>
-                    <strong>{display(selectedUser.postalNo)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>Address Line 1</span>
-                    <strong>{display(selectedUser.addressLine1)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>Address Line 2</span>
-                    <strong>{display(selectedUser.addressLine2)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>Registered At</span>
-                    <strong>{formatDate(selectedUser.createdAt)}</strong>
-                  </div>
-                  <div className="admin-detail-row">
-                    <span>Updated At</span>
-                    <strong>{formatDate(selectedUser.updatedAt)}</strong>
-                  </div>
+            <section className="admin-board">
+              <header className="admin-board__top">
+                <div>
+                  <p className="admin-board__eyebrow">
+                    {activeView === 'users' ? 'User Registry Desk' : 'M1 Filing Desk'}
+                  </p>
+                  <h1>
+                    {activeView === 'users'
+                      ? 'Registered Users & Requested Services'
+                      : 'M1 Tax File Users & Submissions'}
+                  </h1>
                 </div>
-              ) : (
-                <p style={{ color: 'rgba(184,184,184,0.62)' }}>Select a user to see full details.</p>
+
+                <div className="admin-board__actions">
+                  <button className="btn-outline" onClick={loadDashboard}>
+                    <RefreshCw size={14} style={{ marginRight: 6 }} /> Refresh
+                  </button>
+                  {activeView === 'm1' && (
+                    <>
+                      <button className="btn-outline" onClick={handleExportCsv}>
+                        <Download size={14} style={{ marginRight: 6 }} /> CSV
+                      </button>
+                      <button className="btn-outline" onClick={handleExportExcel}>
+                        <FileSpreadsheet size={14} style={{ marginRight: 6 }} /> Excel
+                      </button>
+                    </>
+                  )}
+                </div>
+              </header>
+
+              {(error || warning) && (
+                <div className={`admin-alert ${error ? 'error' : 'warning'}`}>
+                  {error || warning}
+                </div>
               )}
+
+              <div className="admin-kpi-grid">
+                {activeView === 'users' ? (
+                  <>
+                    <div className="admin-kpi">
+                      <span><Users size={16} /> Registered Users</span>
+                      <strong>{users.length}</strong>
+                    </div>
+                    <div className="admin-kpi">
+                      <span><FileText size={16} /> Users With Services</span>
+                      <strong>{usersWithRequests}</strong>
+                    </div>
+                    <div className="admin-kpi">
+                      <span><Users size={16} /> Users Without Requests</span>
+                      <strong>{usersWithoutRequests}</strong>
+                    </div>
+                    <div className="admin-kpi">
+                      <span><BarChart3 size={16} /> Total M1 Requests</span>
+                      <strong>{metrics.total}</strong>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="admin-kpi">
+                      <span><Users size={16} /> M1 Tax File Users</span>
+                      <strong>{m1UserCount}</strong>
+                    </div>
+                    <div className="admin-kpi">
+                      <span><FileText size={16} /> M1 Submissions</span>
+                      <strong>{metrics.total}</strong>
+                    </div>
+                    <div className="admin-kpi">
+                      <span><BarChart3 size={16} /> Submitted</span>
+                      <strong>{metrics.submitted}</strong>
+                    </div>
+                    <div className="admin-kpi">
+                      <span><BarChart3 size={16} /> Draft</span>
+                      <strong>{metrics.draft}</strong>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="admin-main-grid">
+                {activeView === 'users' ? (
+                  <>
+                    <section className="admin-card">
+                      <div className="admin-card__head">
+                        <h3>Registered Users</h3>
+                        <strong>{filteredUsers.length} shown</strong>
+                      </div>
+
+                      <div className="input-wrapper admin-search" style={{ marginBottom: '12px' }}>
+                        <Search size={14} className="input-icon" />
+                        <input
+                          placeholder="Search by NIC, name, phone or email"
+                          value={userQuery}
+                          onChange={e => setUserQuery(e.target.value)}
+                        />
+                      </div>
+
+                      {!filteredUsers.length ? (
+                        <p className="admin-empty">No registered users found.</p>
+                      ) : (
+                        <div className="admin-record-list">
+                          {filteredUsers.map(user => {
+                            const key = nicKey(user.nic);
+                            const userSubmissions = submissionsByNic.get(key) || [];
+                            const latest = userSubmissions[0] || null;
+                            const selected = nicKey(selectedRegistryUser?.nic || '') === key;
+
+                            return (
+                              <button
+                                key={user.id || user.nic}
+                                type="button"
+                                className={`admin-record-item${selected ? ' selected' : ''}`}
+                                onClick={() => setSelectedUserNic(user.nic)}
+                              >
+                                <div className="admin-record-item__name">{display(user.fullName || user.nic)}</div>
+                                <div className="admin-record-item__meta">{display(user.nic)}</div>
+                                <div className="admin-record-item__meta">{display(user.phone)}</div>
+                                <div className="admin-record-item__chips">
+                                  <span className="m1-status-chip">
+                                    {userSubmissions.length} request{userSubmissions.length === 1 ? '' : 's'}
+                                  </span>
+                                  {latest && <span className={statusClass(latest.status)}>{latest.status}</span>}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="admin-card">
+                      <div className="admin-card__head">
+                        <h3>User Details</h3>
+                        <strong>{selectedRegistryUser ? 'Active' : 'No selection'}</strong>
+                      </div>
+
+                      {!selectedRegistryUser ? (
+                        <p className="admin-empty">Select a user to view details and services.</p>
+                      ) : (
+                        <div className="admin-stack">
+                          <div className="admin-detail-grid">
+                            {userRows.map(row => (
+                              <div key={row.label} className="admin-detail-tile">
+                                <span>{row.label}</span>
+                                <strong>{row.value}</strong>
+                              </div>
+                            ))}
+                          </div>
+
+                          <p className="admin-section-label">Requested Services</p>
+                          <div className="admin-detail-grid">
+                            {registryServiceRows.map(row => (
+                              <div key={row.label} className="admin-detail-tile">
+                                <span>{row.label}</span>
+                                <strong>{row.value}</strong>
+                              </div>
+                            ))}
+                          </div>
+
+                          <p className="admin-section-label">Related M1 Requests</p>
+                          {!selectedRegistryUserSubmissions.length ? (
+                            <p className="admin-empty">This user has not requested M1 tax file service yet.</p>
+                          ) : (
+                            <ul className="admin-activity-list">
+                              {selectedRegistryUserSubmissions.map(record => (
+                                <li key={record.id} className="admin-activity-item">
+                                  <div className="admin-activity-item__top">
+                                    <strong>{record.id}</strong>
+                                    <span className={statusClass(record.status)}>{record.status}</span>
+                                  </div>
+                                  <p>{formatIncomeLabel(record.form)}</p>
+                                  <time>{formatDate(record.updatedAt)} | {record.progress}%</time>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  </>
+                ) : (
+                  <>
+                    <section className="admin-card">
+                      <div className="admin-card__head">
+                        <h3>M1 Tax File Users</h3>
+                        <strong>{filteredSubmissions.length} shown</strong>
+                      </div>
+
+                      <div className="input-wrapper admin-search" style={{ marginBottom: '12px' }}>
+                        <Search size={14} className="input-icon" />
+                        <input
+                          placeholder="Search by NIC, name or contact"
+                          value={m1Query}
+                          onChange={e => setM1Query(e.target.value)}
+                        />
+                      </div>
+
+                      {!filteredSubmissions.length ? (
+                        <p className="admin-empty">No M1 submissions found.</p>
+                      ) : (
+                        <div className="admin-record-list">
+                          {filteredSubmissions.map(record => {
+                            const selected = selectedSubmission?.id === record.id;
+                            return (
+                              <button
+                                key={record.id}
+                                type="button"
+                                className={`admin-record-item${selected ? ' selected' : ''}`}
+                                onClick={() => setSelectedSubmissionId(record.id)}
+                              >
+                                <div className="admin-record-item__name">{display(record.userProfile.fullName || 'Unknown')}</div>
+                                <div className="admin-record-item__meta">{display(record.userProfile.nic)}</div>
+                                <div className="admin-record-item__chips">
+                                  <span className={statusClass(record.status)}>{record.status}</span>
+                                  <span className="m1-status-chip">{record.progress}%</span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="admin-card">
+                      <div className="admin-card__head">
+                        <h3>M1 Submission Details</h3>
+                        <strong>{selectedSubmission ? 'Active' : 'No selection'}</strong>
+                      </div>
+
+                      {!selectedSubmission ? (
+                        <p className="admin-empty">Select an M1 submission to view details.</p>
+                      ) : (
+                        <div className="admin-stack">
+                          <div className="admin-detail-grid">
+                            {submissionRows.map(row => (
+                              <div key={row.label} className="admin-detail-tile">
+                                <span>{row.label}</span>
+                                <strong>{row.value}</strong>
+                              </div>
+                            ))}
+
+                            {uploadSummary && (
+                              <>
+                                <div className="admin-detail-tile">
+                                  <span>Uploaded Documents</span>
+                                  <strong>{uploadSummary.uploaded}</strong>
+                                </div>
+                                <div className="admin-detail-tile">
+                                  <span>Upload Later</span>
+                                  <strong>{uploadSummary.later}</strong>
+                                </div>
+                                <div className="admin-detail-tile">
+                                  <span>Missing Documents</span>
+                                  <strong>{uploadSummary.missing}</strong>
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          <p className="admin-section-label">Document Review</p>
+
+                          {!selectedUploadedDocuments.length ? (
+                            <p className="admin-empty">
+                              No uploaded documents available for preview in this submission.
+                            </p>
+                          ) : (
+                            <div className="admin-doc-review">
+                              <p className="admin-empty" style={{ marginBottom: '8px' }}>
+                                Click a document to open a clean preview dialog.
+                              </p>
+
+                              <div className="admin-doc-list admin-doc-list--panel">
+                                {selectedUploadedDocuments.map(item => {
+                                  const verificationStatus = item.doc.verificationStatus || 'pending';
+
+                                  return (
+                                    <button
+                                      key={item.key}
+                                      type="button"
+                                      className="admin-doc-item"
+                                      onClick={() => openDocumentDialog(item.key)}
+                                    >
+                                      <div className="admin-doc-item__head">
+                                        <strong>{item.label}</strong>
+                                        <span className={`admin-doc-badge ${verificationStatus}`}>
+                                          {verificationStatus}
+                                        </span>
+                                      </div>
+                                      <p>{item.category}</p>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  </>
+                )}
+              </div>
+
             </section>
+
+            <aside className="admin-sidepanel">
+              {activeView === 'users' ? (
+                <>
+                  <section className="admin-card admin-card--compact">
+                    <div className="admin-card__head">
+                      <h3>Service Snapshot</h3>
+                      <strong>{selectedRegistrySubmissionMetrics.total}</strong>
+                    </div>
+
+                    {!selectedRegistryUser ? (
+                      <p className="admin-empty">No user selected.</p>
+                    ) : (
+                      <div className="admin-pill-grid">
+                        <div className="admin-pill-stat">
+                          <span>M1 Requests</span>
+                          <strong>{selectedRegistrySubmissionMetrics.total}</strong>
+                        </div>
+                        <div className="admin-pill-stat">
+                          <span>Submitted</span>
+                          <strong>{selectedRegistrySubmissionMetrics.submitted}</strong>
+                        </div>
+                        <div className="admin-pill-stat">
+                          <span>Draft</span>
+                          <strong>{selectedRegistrySubmissionMetrics.draft}</strong>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="admin-card admin-card--compact">
+                    <div className="admin-card__head">
+                      <h3>Latest M1 Document Health</h3>
+                      <strong>{selectedRegistryLatestSubmission ? `${selectedRegistryLatestSubmission.progress}%` : '-'}</strong>
+                    </div>
+
+                    {!selectedRegistryLatestUploadSummary ? (
+                      <p className="admin-empty">No M1 request found for this user.</p>
+                    ) : (
+                      <div className="admin-pill-grid">
+                        <div className="admin-pill-stat">
+                          <span>Uploaded</span>
+                          <strong>{selectedRegistryLatestUploadSummary.uploaded}</strong>
+                        </div>
+                        <div className="admin-pill-stat">
+                          <span>Later</span>
+                          <strong>{selectedRegistryLatestUploadSummary.later}</strong>
+                        </div>
+                        <div className="admin-pill-stat">
+                          <span>Missing</span>
+                          <strong>{selectedRegistryLatestUploadSummary.missing}</strong>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="admin-card admin-card--compact">
+                    <div className="admin-card__head">
+                      <h3>Recent Registrations</h3>
+                      <strong>{recentUsers.length}</strong>
+                    </div>
+
+                    {!recentUsers.length ? (
+                      <p className="admin-empty">No registered users found.</p>
+                    ) : (
+                      <ul className="admin-activity-list">
+                        {recentUsers.map(item => (
+                          <li key={item.id || item.nic} className="admin-activity-item">
+                            <div className="admin-activity-item__top">
+                              <strong>{display(item.fullName || item.nic)}</strong>
+                            </div>
+                            <p>{display(item.nic)}</p>
+                            <time>{formatDate(item.createdAt)}</time>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </>
+              ) : (
+                <>
+                  <section className="admin-card admin-card--compact">
+                    <div className="admin-card__head">
+                      <h3>Document Health</h3>
+                      <strong>{selectedSubmission ? `${selectedSubmission.progress}%` : '-'}</strong>
+                    </div>
+
+                    {!uploadSummary ? (
+                      <p className="admin-empty">No submission selected.</p>
+                    ) : (
+                      <div className="admin-pill-grid">
+                        <div className="admin-pill-stat">
+                          <span>Uploaded</span>
+                          <strong>{selectedDocumentVerificationSummary.uploaded}</strong>
+                        </div>
+                        <div className="admin-pill-stat">
+                          <span>Verified</span>
+                          <strong>{selectedDocumentVerificationSummary.verified}</strong>
+                        </div>
+                        <div className="admin-pill-stat">
+                          <span>Pending</span>
+                          <strong>{selectedDocumentVerificationSummary.pending}</strong>
+                        </div>
+                        <div className="admin-pill-stat">
+                          <span>Rejected</span>
+                          <strong>{selectedDocumentVerificationSummary.rejected}</strong>
+                        </div>
+                        <div className="admin-pill-stat">
+                          <span>Later</span>
+                          <strong>{uploadSummary.later}</strong>
+                        </div>
+                        <div className="admin-pill-stat">
+                          <span>Missing</span>
+                          <strong>{uploadSummary.missing}</strong>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="admin-card admin-card--compact">
+                    <div className="admin-card__head">
+                      <h3>Registry Snapshot</h3>
+                      <strong>{users.length} users</strong>
+                    </div>
+
+                    {!selectedSubmissionUser ? (
+                      <p className="admin-empty">Select a submission to view account info.</p>
+                    ) : (
+                      <div className="admin-detail-grid">
+                        {submissionUserRows.map(row => (
+                          <div key={row.label} className="admin-detail-tile">
+                            <span>{row.label}</span>
+                            <strong>{row.value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="admin-card admin-card--compact">
+                    <div className="admin-card__head">
+                      <h3>Recent Activity</h3>
+                      <strong>{recentRecords.length}</strong>
+                    </div>
+
+                    {!recentRecords.length ? (
+                      <p className="admin-empty">No recent activity yet.</p>
+                    ) : (
+                      <ul className="admin-activity-list">
+                        {recentRecords.map(record => (
+                          <li key={record.id} className="admin-activity-item">
+                            <div className="admin-activity-item__top">
+                              <strong>{display(record.userProfile.fullName || record.userProfile.nic)}</strong>
+                              <span className={statusClass(record.status)}>{record.status}</span>
+                            </div>
+                            <p>{record.id}</p>
+                            <time>{formatDate(record.updatedAt)}</time>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </>
+              )}
+            </aside>
           </div>
         )}
       </div>
+
+      {isDocumentDialogOpen && selectedDocument && (
+        <div
+          className="admin-doc-dialog__overlay"
+          role="presentation"
+          onClick={closeDocumentDialog}
+        >
+          <div
+            className="admin-doc-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Document preview"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="admin-doc-dialog__header">
+              <div>
+                <p>{selectedDocument.category}</p>
+                <h3>{selectedDocument.label}</h3>
+              </div>
+
+              <button type="button" className="admin-doc-dialog__close" onClick={closeDocumentDialog}>
+                <X size={16} /> Close
+              </button>
+            </div>
+
+            <div className="admin-doc-dialog__meta">
+              <span className="m1-status-chip">{display(selectedDocument.doc.fileName || '')}</span>
+              <span className="m1-status-chip">{display(selectedDocument.doc.fileType || '')}</span>
+              <span className={`admin-doc-badge ${selectedDocument.doc.verificationStatus || 'pending'}`}>
+                {selectedDocument.doc.verificationStatus || 'pending'}
+              </span>
+              <span className="m1-status-chip">Verified: {formatDate(selectedDocument.doc.verifiedAt || null)}</span>
+            </div>
+
+            <div className="admin-doc-dialog__viewer">
+              {selectedDocument.doc.fileDataUrl ? (
+                selectedDocumentPreviewType === 'image' ? (
+                  <img
+                    src={selectedDocument.doc.fileDataUrl}
+                    alt={selectedDocument.label}
+                    className="admin-doc-dialog__image"
+                  />
+                ) : selectedDocumentPreviewType === 'pdf' ? (
+                  <iframe
+                    src={isPdfDoc(selectedDocument.doc.fileType, selectedDocument.doc.fileName)
+                      ? `${selectedDocument.doc.fileDataUrl}#toolbar=1&navpanes=0`
+                      : selectedDocument.doc.fileDataUrl}
+                    title={selectedDocument.label}
+                    className="admin-doc-dialog__iframe"
+                  />
+                ) : (
+                  <div className="admin-doc-dialog__unsupported">
+                    <p className="admin-empty" style={{ marginBottom: '8px' }}>
+                      This document type does not support inline preview in browser.
+                    </p>
+                    <p className="admin-empty">
+                      Click Open in New Tab to view or download, then verify/reject here.
+                    </p>
+                  </div>
+                )
+              ) : (
+                <p className="admin-empty">Preview not available for this file.</p>
+              )}
+            </div>
+
+            <div className="admin-doc-dialog__actions">
+              {selectedDocument.doc.fileDataUrl && (
+                <a
+                  href={selectedDocument.doc.fileDataUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-outline"
+                >
+                  <Eye size={14} style={{ marginRight: 6 }} /> Open in New Tab
+                </a>
+              )}
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => handleDocumentVerification(selectedDocument.key, 'verified')}
+              >
+                <CheckCircle2 size={14} style={{ marginRight: 6 }} /> Verify
+              </button>
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => handleDocumentVerification(selectedDocument.key, 'rejected')}
+              >
+                <XCircle size={14} style={{ marginRight: 6 }} /> Reject
+              </button>
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => handleDocumentVerification(selectedDocument.key, 'pending')}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
