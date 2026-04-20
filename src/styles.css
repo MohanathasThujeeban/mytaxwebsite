@@ -2238,7 +2238,22 @@ button { cursor: pointer; }
     inset 0 0 30px rgba(0, 0, 0, 0.60);
   position: relative;
   z-index: 2;
-  animation: fadeIn 0.8s ease, breatheLogo 6s ease-in-out infinite,rotateY 6s linear infinite;
+  animation: 
+    fadeIn 0.8s ease,
+    breatheLogo 6s ease-in-out infinite;
+
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.4s ease;
+  cursor: pointer;
+}
+
+.hero__logo:hover {
+  transform: perspective(600px) scale(1.12);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.15),
+    0 0 60px rgba(255, 255, 255, 0.22),
+    0 0 110px rgba(255, 255, 255, 0.10),
+    inset 0 0 30px rgba(0, 0, 0, 0.60);
 }
 
 @keyframes spinCW {
@@ -2270,11 +2285,6 @@ button { cursor: pointer; }
   50%       { opacity: 1; }
 }
 
-@keyframes rotateY {
-  0%   { transform: perspective(600px) rotateY(0deg); }
-  50%  { transform: perspective(600px) rotateY(180deg); }
-  100% { transform: perspective(600px) rotateY(360deg); }
-}
 
 .hero__title {
   margin-top: 40px;
