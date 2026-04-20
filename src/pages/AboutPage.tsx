@@ -175,7 +175,8 @@ const AboutPage: React.FC = () => {
             padding: '24px',
             background: 'rgba(13,13,13,0.6)',
             borderRadius: '12px',
-            border: '1px solid rgba(184,184,184,0.08)',
+            border: '1px solid rgba(212, 175, 55, 0.28)',
+            boxShadow:'0 10px 30px rgba(0,0,0,0.6), 0 0 20px rgba(212, 175, 55, 0.12)'
           }}
         >
           <p

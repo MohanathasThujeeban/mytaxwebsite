@@ -225,10 +225,10 @@ const HomePage: React.FC = () => {
                 onMouseEnter={(e) => {
                   const el = e.currentTarget as HTMLButtonElement;
 
-                  el.style.borderColor = "rgba(184,184,184,0.28)";
+                  el.style.borderColor = "rgba(212, 175, 55, 0.28)";
                   el.style.transform = "translateY(-6px) scale(0.98)";
                   el.style.boxShadow =
-                    "0 10px 30px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)";
+                    "0 10px 30px rgba(0,0,0,0.6), 0 0 0 1px rgba(212, 175, 55, 0.05),0 0 40px rgba(180, 140, 30, 0.10)";
 
                   const icon = el.querySelector(".icon") as HTMLElement;
                   const arrow = el.querySelector(".arrow") as HTMLElement;

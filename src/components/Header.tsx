@@ -90,35 +90,48 @@ const Header: React.FC = () => {
 
       {/* ── Desktop Nav ── */}
       <nav className="header__nav">
-        {navLinks.map(link => (
-          <Link key={link.href} to={link.href} className="header__nav-link">
+  {navLinks.map(link => (
+    <Link
+      key={link.href}
+      to={link.href}
+      className={`header__nav-link ${location.pathname === link.href ? 'active' : ''}`}
+    >
+      {link.label}
+    </Link>
+  ))}
+
+  {/* More dropdown */}
+  <div className="header__nav-more" ref={moreRef}>
+    <button
+      className={`header__nav-link header__nav-more-btn ${moreLinks.some(l => location.pathname === l.href) ? 'active' : ''}`}
+      onClick={() => setMoreOpen(o => !o)}
+    >
+      {s['more'] ?? 'More'}{' '}
+      <ChevronDown
+        size={12}
+        style={{
+          transition: 'transform 0.2s',
+          transform: moreOpen ? 'rotate(180deg)' : undefined,
+        }}
+      />
+    </button>
+
+    {moreOpen && (
+      <div className="header__more-dropdown">
+        {moreLinks.map(link => (
+          <Link
+            key={link.href}
+            to={link.href}
+            className={`header__more-link ${location.pathname === link.href ? 'active' : ''}`}
+            onClick={() => setMoreOpen(false)}
+          >
             {link.label}
           </Link>
         ))}
-        {/* More dropdown */}
-        <div className="header__nav-more" ref={moreRef}>
-          <button
-            className="header__nav-link header__nav-more-btn"
-            onClick={() => setMoreOpen(o => !o)}
-          >
-            {s['more'] ?? 'More'} <ChevronDown size={12} style={{ transition: 'transform 0.2s', transform: moreOpen ? 'rotate(180deg)' : undefined }} />
-          </button>
-          {moreOpen && (
-            <div className="header__more-dropdown">
-              {moreLinks.map(link => (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className="header__more-link"
-                  onClick={() => setMoreOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </nav>
+      </div>
+    )}
+  </div>
+</nav>
 
       {/* ── Controls ── */}
       <div className="header__controls">

@@ -136,7 +136,8 @@ const CareersPage: React.FC = () => {
             padding: '36px',
             textAlign: 'center',
             background: 'linear-gradient(145deg, #0d0d0d, #080808)',
-            border: '1px solid rgba(184,184,184,0.12)',
+             border: '1px solid rgba(212, 175, 55, 0.28)',
+            boxShadow:'0 10px 30px rgba(0,0,0,0.6), 0 0 20px rgba(212, 175, 55, 0.12)',
             borderRadius: '20px',
           }}
         >
