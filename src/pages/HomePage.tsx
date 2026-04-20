@@ -36,12 +36,18 @@ const HomePage: React.FC = () => {
           HERO
           ══════════════════════════════ */}
       <section className="hero">
-        <img
+        <div className="hero__logo-wrap">
+          <div className="ring-glow"></div>
+          <div className="ring-static"></div>
+          <div className="ring-slow"></div>
+          <img
           src="/images/logo.png"
           alt="MyTax Logo"
           className="hero__logo"
           onError={e => ((e.target as HTMLImageElement).style.visibility = 'hidden')}
-        />
+          />
+        </div>
+        
         <h1 className="hero__title">
           MyTax<sup>™</sup>
         </h1>
