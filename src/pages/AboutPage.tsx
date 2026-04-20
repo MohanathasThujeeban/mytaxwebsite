@@ -63,6 +63,7 @@ const AboutPage: React.FC = () => {
         <div className="stats-grid">
           {STATS.map(stat => (
             <div key={stat.label} className="stat-card silver-box">
+              <div className="card-line"></div>
               <div className="stat-card__value">{stat.value}</div>
               <div className="stat-card__label">{stat.label}</div>
             </div>
