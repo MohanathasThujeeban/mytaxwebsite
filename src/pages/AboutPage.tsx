@@ -2,53 +2,54 @@ import React from 'react';
 import { BarChart2, ClipboardList, Package, Receipt, Landmark, FileEdit, Home, Target, Eye, Building2, Monitor, Smartphone, Play, GraduationCap, Bot, Calendar, UserCheck } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-const SC_SERVICES = [
-  {
-    icon: '📊',
-    title: 'Accounts',
-    items: ['Monthly Finance Monitoring', 'Monthly Accounts', 'Business Profit Reports', 'Loan Purpose Accounts', 'Annual Accounts'],
-  },
-  {
-    icon: '📋',
-    title: 'Proposals',
-    items: ['Loan Proposal', 'Business Proposal'],
-  },
-  {
-    icon: '📦',
-    title: 'Inventory Management',
-    items: ['Stock Verification', 'Digital Bar Stock Counts'],
-  },
-  {
-    icon: '🧾',
-    title: 'Tax',
-    items: ['Income Tax Filing', 'Income Tax Registration', 'VAT Consultations', 'Tax Consultations'],
-  },
-  {
-    icon: '🏛️',
-    title: 'Company Registrations',
-    items: ['Business Registration', 'Charity Registration'],
-  },
-  {
-    icon: '📝',
-    title: 'Company Secretarial Works',
-    items: ['Annual Return Filing', 'Secretary Services'],
-  },
-  {
-    icon: '🏠',
-    title: 'Real Estates',
-    items: ['Deal Advisory'],
-  },
-];
-
-const STATS = [
-  { value: '10,000+', label: 'Clients Served' },
-  { value: '5+', label: 'Years Experience' },
-  { value: '25,000+', label: 'Tax Returns Filed' },
-  { value: '25', label: 'Districts Covered' },
-];
 
 const AboutPage: React.FC = () => {
   const { s } = useLanguage();
+
+  const SC_SERVICES = [
+    {
+      icon: '📊',
+      title: s['scAccounts'],
+      items: [s['scMonthlyFinance'], s['scMonthlyAccounts'], s['scProfitReports'], s['scLoanAccounts'], s['scAnnualAccounts']],
+    },
+    {
+      icon: '📋',
+      title: s['scProposals'],
+      items: [s['scLoanProposal'], s['scBusinessProposal']],
+    },
+    {
+      icon: '📦',
+      title: s['scInventory'],
+      items: [s['scStockVerification'], s['scDigitalStock']],
+    },
+    {
+      icon: '🧾',
+      title: s['scTaxCategory'],
+      items: [s['scIncomeTaxFiling'], s['scIncomeTaxReg'], s['scVatConsult'], s['scTaxConsult']],
+    },
+    {
+      icon: '🏛️',
+      title: s['scCompanyReg'],
+      items: [s['scBusinessReg'], s['scCharityReg']],
+    },
+    {
+      icon: '📝',
+      title: s['scSecretarial'],
+      items: [s['scAnnualReturn'], s['scSecretary']],
+    },
+    {
+      icon: '🏠',
+      title: s['scRealEstate'],
+      items: [s['scDealAdvisory']],
+    },
+  ];
+
+  const STATS = [
+    { value: '10,000+', label: s['statsClients'] },
+    { value: '5+', label: s['statsYears'] },
+    { value: '25,000+', label: s['statsTaxReturns'] },
+    { value: '25', label: s['statsDistricts'] },
+  ];
 
   return (
     <main className="sub-page">
@@ -99,7 +100,7 @@ const AboutPage: React.FC = () => {
 
         {/* S&C Services */}
         <div style={{ marginTop: '48px' }}>
-          <div className="section-label" style={{ marginBottom: '6px' }}>SUBSIDIARY SERVICES</div>
+          <div className="section-label" style={{ marginBottom: '6px' }}>{s['subsidiaryServices']}</div>
           <h2 className="section-heading" style={{ fontSize: '22px' }}>
             S&C Business Consultants (Pvt) Ltd
           </h2>
@@ -139,12 +140,12 @@ const AboutPage: React.FC = () => {
           <div className="section-card__header"><Monitor size={16} style={{ marginRight: 8, verticalAlign: 'middle' }} />Digital Tools</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '4px' }}>
             {[
-              { icon: <Smartphone size={16} />, label: 'MyTax Digital App', tag: 'Free' },
-              { icon: <Play size={16} />, label: 'Tax Simple Guidance Videos', tag: 'Free' },
-              { icon: <GraduationCap size={16} />, label: 'User Guide', tag: 'Free' },
-              { icon: <Bot size={16} />, label: 'AI Tax Instructor', tag: 'Free' },
-              { icon: <Calendar size={16} />, label: 'Tax Calendar', tag: 'Free' },
-              { icon: <UserCheck size={16} />, label: 'Agent Guide', tag: 'Free' },
+              { icon: <Smartphone size={16} />, label: s['toolMyTaxApp'], tag: s['free'] },
+              { icon: <Play size={16} />, label: s['toolGuidanceVideos'], tag: s['free'] },
+              { icon: <GraduationCap size={16} />, label: s['toolUserGuideLabel'], tag: s['free'] },
+              { icon: <Bot size={16} />, label: s['toolAIInstructor'], tag: s['free'] },
+              { icon: <Calendar size={16} />, label: s['toolTaxCalendar'], tag: s['free'] },
+              { icon: <UserCheck size={16} />, label: s['toolAgentGuide'], tag: s['free'] },
             ].map(tool => (
               <div
                 key={tool.label}

@@ -1,51 +1,8 @@
-﻿import React from 'react';
+import React from 'react';
 import { Receipt, User, UserCheck, Building2, Bot, Calendar, FolderOpen, BookOpen, AlertTriangle, Files, CreditCard, Ban, FileText, RefreshCw, Bell } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-const GUIDE_TOPICS: { icon: React.ReactNode; key: string; desc: string; free: boolean; available: boolean }[] = [
-  {
-    icon: <Receipt size={28} />,
-    key: 'guideUseOfTaxServices',
-    desc: 'Learn how to use all MyTax digital services effectively, from TIN registration to annual tax filing.',
-    free: true,
-    available: true,
-  },
-  {
-    icon: <User size={28} />,
-    key: 'guideUserGuide',
-    desc: 'Step-by-step guide for individual taxpayers to navigate the MyTax platform and complete their filings.',
-    free: true,
-    available: true,
-  },
-  {
-    icon: <UserCheck size={28} />,
-    key: 'guideAgentGuide',
-    desc: 'Detailed guide for tax agents and officers on managing client portfolios and assignments.',
-    free: true,
-    available: true,
-  },
-  {
-    icon: <Building2 size={28} />,
-    key: 'guideAboutUs',
-    desc: 'Learn about Matrix Investments PLC, our mission, group companies, and the services we offer across Sri Lanka.',
-    free: true,
-    available: true,
-  },
-  {
-    icon: <Bot size={28} />,
-    key: 'guideHelpAI',
-    desc: 'Interact with our AI-powered tax instructor in Sinhala, Tamil, or English — text and voice supported.',
-    free: true,
-    available: false,
-  },
-  {
-    icon: <Calendar size={28} />,
-    key: 'guideTaxCalendar',
-    desc: 'Important tax deadlines, filing due dates, payment schedules, and penalty avoidance timeline for Sri Lanka.',
-    free: true,
-    available: true,
-  },
-];
+
 
 const GENERAL_GUIDE: { key: string; icon: React.ReactNode }[] = [
   { key: 'documentsForLogin', icon: <FolderOpen size={20} /> },
@@ -61,6 +18,51 @@ const GENERAL_GUIDE: { key: string; icon: React.ReactNode }[] = [
 const GuidePage: React.FC = () => {
   const { s } = useLanguage();
 
+  const GUIDE_TOPICS = [
+    {
+      icon: <Receipt size={28} />,
+      key: 'guideUseOfTaxServices',
+      desc: s['guideUseOfTaxDesc'],
+      free: true,
+      available: true,
+    },
+    {
+      icon: <User size={28} />,
+      key: 'guideUserGuide',
+      desc: s['guideUserGuideDesc'],
+      free: true,
+      available: true,
+    },
+    {
+      icon: <UserCheck size={28} />,
+      key: 'guideAgentGuide',
+      desc: s['guideAgentGuideDesc'],
+      free: true,
+      available: true,
+    },
+    {
+      icon: <Building2 size={28} />,
+      key: 'guideAboutUs',
+      desc: s['guideAboutUsDesc'],
+      free: true,
+      available: true,
+    },
+    {
+      icon: <Bot size={28} />,
+      key: 'guideHelpAI',
+      desc: s['guideHelpAIDesc'],
+      free: true,
+      available: false,
+    },
+    {
+      icon: <Calendar size={28} />,
+      key: 'guideTaxCalendar',
+      desc: s['guideTaxCalendarDesc'],
+      free: true,
+      available: true,
+    },
+  ];
+
   return (
     <main className="sub-page">
       <div className="sub-page__hero">
@@ -71,9 +73,9 @@ const GuidePage: React.FC = () => {
 
       <div className="container">
         {/* Video Guide Topics */}
-        <div className="section-label">VIDEO GUIDES</div>
+        <div className="section-label">{s['videoGuidesTitle']?.toUpperCase() || 'VIDEO GUIDES'}</div>
         <h2 className="section-heading" style={{ fontSize: '26px', marginTop: '4px' }}>
-          Tax Simple Guidance Videos
+          {s['toolGuidanceVideos']}
         </h2>
         <div className="section-heading-divider" />
 
@@ -119,7 +121,7 @@ const GuidePage: React.FC = () => {
 
         {/* General Tax Guide */}
         <div style={{ marginTop: '64px' }}>
-          <div className="section-label">GENERAL GUIDE</div>
+          <div className="section-label">{s['guide']?.toUpperCase() || 'GENERAL GUIDE'}</div>
           <h2 className="section-heading" style={{ fontSize: '26px', marginTop: '4px' }}>
             {s['guideTitle']}
           </h2>
@@ -138,7 +140,7 @@ const GuidePage: React.FC = () => {
 
         {/* SMS Alerts Info */}
         <div className="section-card" style={{ marginTop: '48px' }}>
-          <div className="section-card__header"><Bell size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} /> SMS Alert Notifications</div>
+          <div className="section-card__header"><Bell size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} /> {s['smsAlertsTitle']}</div>
           <p
             style={{
               color: 'rgba(234,234,234,0.6)',
@@ -147,16 +149,16 @@ const GuidePage: React.FC = () => {
               marginBottom: '20px',
             }}
           >
-            Stay informed with automatic SMS notifications for every step of your tax journey:
+            {s['smsAlertsDesc']}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {[
-              { tag: 'Registration', text: 'Client ID confirmation upon registration' },
-              { tag: 'Assignment', text: 'When your work is assigned to an officer' },
-              { tag: 'Documents', text: 'Alerts for pending or missing documents' },
-              { tag: 'Completed', text: 'Notification when your tax work is done' },
-              { tag: 'Invoice', text: 'Invoice generated with due date' },
-              { tag: 'Confirmed', text: 'Tax return filing confirmation with reference number' },
+              { tag: s['smsRegTag'], text: s['smsRegText'] },
+              { tag: s['smsAssignTag'], text: s['smsAssignText'] },
+              { tag: s['smsDocsTag'], text: s['smsDocsText'] },
+              { tag: s['smsDoneTag'], text: s['smsDoneText'] },
+              { tag: s['smsInvoiceTag'], text: s['smsInvoiceText'] },
+              { tag: s['smsConfirmedTag'], text: s['smsConfirmedText'] },
             ].map(alert => (
               <div
                 key={alert.tag}

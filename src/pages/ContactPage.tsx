@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Clock, Smartphone, Globe, CheckCircle2, SendHorizonal, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -23,13 +23,13 @@ const ContactPage: React.FC = () => {
     }, 1200);
   };
 
-  const CONTACT_ITEMS: { icon: React.ReactNode; label: string; value: string }[] = [
-    { icon: <Mail size={20} />, label: 'Email', value: 'info@matrixinvestments.lk' },
-    { icon: <Phone size={20} />, label: 'Hotline', value: '+94 11 000 0000' },
-    { icon: <MapPin size={20} />, label: 'Location', value: 'Colombo, Sri Lanka' },
-    { icon: <Clock size={20} />, label: 'Business Hours', value: 'Mon–Fri: 8:30am – 5:00pm' },
-    { icon: <Smartphone size={20} />, label: 'WhatsApp', value: '+94 77 000 0000' },
-    { icon: <Globe size={20} />, label: 'Web', value: 'www.matrixinvestments.lk' },
+  const CONTACT_ITEMS = [
+    { icon: <Mail size={20} />, label: s['contactEmailLabel'], value: 'info@matrixinvestments.lk' },
+    { icon: <Phone size={20} />, label: s['contactHotlineLabel'], value: '+94 11 000 0000' },
+    { icon: <MapPin size={20} />, label: s['contactLocationLabel'], value: s['contactLocationValue'] },
+    { icon: <Clock size={20} />, label: s['contactHoursLabel'], value: s['contactBusinessHoursValue'] },
+    { icon: <Smartphone size={20} />, label: s['contactWhatsAppLabel'], value: '+94 77 000 0000' },
+    { icon: <Globe size={20} />, label: s['contactWebLabel'], value: 'www.matrixinvestments.lk' },
   ];
 
   return (
@@ -86,10 +86,10 @@ const ContactPage: React.FC = () => {
               }}
             >
               <div style={{ fontSize: '13px', color: 'rgba(234,234,234,0.7)', lineHeight: 1.7 }}>
-                 All queries are responded to within <strong style={{ color: 'var(--silver)' }}>24 business hours</strong>.
+                 {s['responseCommitment1']}
               </div>
               <div style={{ fontSize: '13px', color: 'rgba(234,234,234,0.7)', lineHeight: 1.7, marginTop: '6px' }}>
-                 Complaints are escalated to a senior officer within <strong style={{ color: 'var(--silver)' }}>48 hours</strong>.
+                 {s['responseCommitment2']}
               </div>
             </div>
           </div>
@@ -103,13 +103,13 @@ const ContactPage: React.FC = () => {
                   {s['thankYouContact']}
                 </div>
                 <p className="verified-text">
-                  Our team will review your message and respond shortly.
+                  {s['reviewAndRespond']}
                 </p>
                 <button
                   className="btn-outline"
                   onClick={() => { setSubmitted(false); setForm({ name: '', email: '', phone: '', subject: '', message: '' }); }}
                 >
-                  Send Another
+                  {s['sendAnother']}
                 </button>
               </div>
             ) : (
@@ -124,7 +124,7 @@ const ContactPage: React.FC = () => {
                         <input
                           type="text"
                           name="name"
-                          placeholder="Your full name"
+                          placeholder={s['phFullName']}
                           value={form.name}
                           onChange={handleChange}
                           required
@@ -137,7 +137,7 @@ const ContactPage: React.FC = () => {
                         <input
                           type="email"
                           name="email"
-                          placeholder="you@example.com"
+                          placeholder={s['phEmail']}
                           value={form.email}
                           onChange={handleChange}
                           required
@@ -150,7 +150,7 @@ const ContactPage: React.FC = () => {
                         <input
                           type="tel"
                           name="phone"
-                          placeholder="+94 XX XXX XXXX"
+                          placeholder={s['phPhone']}
                           value={form.phone}
                           onChange={handleChange}
                         />
@@ -162,7 +162,7 @@ const ContactPage: React.FC = () => {
                         <input
                           type="text"
                           name="subject"
-                          placeholder="Subject of your enquiry"
+                          placeholder={s['phSubject']}
                           value={form.subject}
                           onChange={handleChange}
                         />
@@ -174,7 +174,7 @@ const ContactPage: React.FC = () => {
                         <textarea
                           name="message"
                           rows={5}
-                          placeholder="Write your message here..."
+                          placeholder={s['phMessage']}
                           value={form.message}
                           onChange={handleChange}
                           required
@@ -198,7 +198,7 @@ const ContactPage: React.FC = () => {
                       disabled={loading}
                     >
                       {loading ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>Sending...</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>{s['sending']}</span>
                       ) : (
                         <><SendHorizonal size={15} style={{ marginRight: '6px' }} />{s['submitBtn']}</>
                       )}
@@ -217,7 +217,7 @@ const ContactPage: React.FC = () => {
                       marginBottom: '16px',
                     }}
                   >
-                    For formal complaints regarding our services, officers, or platform, please use the form above with subject "Complaint" — or contact us directly at:
+                    {s['complaintFormDesc']}
                   </p>
                   <div
                     style={{
@@ -246,7 +246,7 @@ const ContactPage: React.FC = () => {
                         lineHeight: 1.7,
                       }}
                     >
-                      All complaints are handled confidentially and in accordance with our PDPA-compliant data handling policy.
+                      {s['complaintPdpaNote']}
                     </div>
                   </div>
                 </div>

@@ -1,53 +1,55 @@
-﻿import React from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Building2, CreditCard, BarChart2, ClipboardList, Package, Receipt, Landmark, FileEdit, Home } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-const CORE_SERVICES: { icon: React.ReactNode; key: string; descKey: string; tag: string; tagClass: string }[] = [
-  {
-    icon: <User size={28} />,
-    key: 'individualTaxFiling',
-    descKey: 'individualTaxDesc',
-    tag: 'Individuals',
-    tagClass: 'tag-free',
-  },
-  {
-    icon: <Building2 size={28} />,
-    key: 'businessTaxFiling',
-    descKey: 'businessTaxDesc',
-    tag: 'Businesses',
-    tagClass: 'tag-free',
-  },
-  {
-    icon: <CreditCard size={28} />,
-    key: 'tinRegistration',
-    descKey: 'tinRegistrationDesc',
-    tag: 'Registration',
-    tagClass: 'tag-free',
-  },
-  {
-    icon: <BarChart2 size={28} />,
-    key: 'complianceMonitoring',
-    descKey: 'complianceMonitoringDesc',
-    tag: 'Monitoring',
-    tagClass: 'tag-paid',
-  },
-];
 
-const PLATFORM_SERVICES = [
-  { code: 'M1', label: 'Tax File Submission', tag: 'Primary', tagClass: 'tag-paid' },
-  { code: 'M2', label: 'TIN Number Status', tag: 'Free', tagClass: 'tag-free' },
-  { code: 'M3', label: 'Tax Calculator', tag: 'Free', tagClass: 'tag-free' },
-  { code: 'M5', label: 'Final Tax Computation', tag: 'Paid', tagClass: 'tag-paid' },
-  { code: 'M6', label: 'TIN Certificate Request', tag: 'Paid', tagClass: 'tag-paid' },
-  { code: 'M7', label: 'TIN Certificate Application', tag: 'Paid', tagClass: 'tag-paid' },
-  { code: 'M8', label: 'Tax Payer Information Update', tag: 'Paid', tagClass: 'tag-paid' },
-  { code: 'M9', label: 'Tax Administration Support', tag: 'Paid', tagClass: 'tag-paid' },
-];
 
 const ServicesPage: React.FC = () => {
   const { s } = useLanguage();
   const navigate = useNavigate();
+
+  const CORE_SERVICES = [
+    {
+      icon: <User size={28} />,
+      key: 'individualTaxFiling',
+      descKey: 'individualTaxDesc',
+      tag: s['tagIndividuals'],
+      tagClass: 'tag-free',
+    },
+    {
+      icon: <Building2 size={28} />,
+      key: 'businessTaxFiling',
+      descKey: 'businessTaxDesc',
+      tag: s['tagBusinesses'],
+      tagClass: 'tag-free',
+    },
+    {
+      icon: <CreditCard size={28} />,
+      key: 'tinRegistration',
+      descKey: 'tinRegistrationDesc',
+      tag: s['tagRegistration'],
+      tagClass: 'tag-free',
+    },
+    {
+      icon: <BarChart2 size={28} />,
+      key: 'complianceMonitoring',
+      descKey: 'complianceMonitoringDesc',
+      tag: s['tagMonitoring'],
+      tagClass: 'tag-paid',
+    },
+  ];
+
+  const PLATFORM_SERVICES = [
+    { code: 'M1', label: s['platM1Label'], tag: s['tagPrimary'], tagClass: 'tag-paid' },
+    { code: 'M2', label: s['platM2Label'], tag: s['free'], tagClass: 'tag-free' },
+    { code: 'M3', label: s['platM3Label'], tag: s['free'], tagClass: 'tag-free' },
+    { code: 'M5', label: s['platM5Label'], tag: s['paid'], tagClass: 'tag-paid' },
+    { code: 'M6', label: s['platM6Label'], tag: s['paid'], tagClass: 'tag-paid' },
+    { code: 'M7', label: s['platM7Label'], tag: s['paid'], tagClass: 'tag-paid' },
+    { code: 'M8', label: s['platM8Label'], tag: s['paid'], tagClass: 'tag-paid' },
+    { code: 'M9', label: s['platM9Label'], tag: s['paid'], tagClass: 'tag-paid' },
+  ];
 
   return (
     <main className="sub-page">
@@ -59,9 +61,9 @@ const ServicesPage: React.FC = () => {
 
       <div className="container">
         {/* Core Services */}
-        <div className="section-label">CORE SERVICES</div>
+        <div className="section-label">{s['coreServices']?.toUpperCase() || 'CORE SERVICES'}</div>
         <h2 className="section-heading" style={{ fontSize: '26px', marginTop: '4px' }}>
-          Tax Filing & Compliance
+          {s['taxFilingComplianceTitle']}
         </h2>
         <div className="section-heading-divider" />
 
@@ -80,9 +82,9 @@ const ServicesPage: React.FC = () => {
 
         {/* MyTax Platform Services */}
         <div style={{ marginTop: '64px' }}>
-          <div className="section-label">PLATFORM MODULES</div>
+          <div className="section-label">{s['platformModules']?.toUpperCase() || 'PLATFORM MODULES'}</div>
           <h2 className="section-heading" style={{ fontSize: '26px', marginTop: '4px' }}>
-            MyTax Digital Services
+            {s['myTaxDigitalServices']}
           </h2>
           <div className="section-heading-divider" />
           <div className="services-grid">
@@ -100,7 +102,7 @@ const ServicesPage: React.FC = () => {
 
         {/* S&C Expanded Services */}
         <div style={{ marginTop: '64px' }}>
-          <div className="section-label">SUBSIDIARY SERVICES</div>
+          <div className="section-label">{s['subsidiaryServices']?.toUpperCase() || 'SUBSIDIARY SERVICES'}</div>
           <h2 className="section-heading" style={{ fontSize: '26px', marginTop: '4px' }}>
             S&C Business Consultants (Pvt) Ltd
           </h2>
@@ -109,38 +111,38 @@ const ServicesPage: React.FC = () => {
             {[
               {
                 icon: <BarChart2 size={18} />,
-                title: 'Accounts',
-                items: ['Monthly Finance Monitoring', 'Monthly Accounts', 'Business Profit Reports', 'Loan Purpose Accounts', 'Annual Accounts'],
+                title: s['scAccounts'],
+                items: [s['scMonthlyFinance'], s['scMonthlyAccounts'], s['scProfitReports'], s['scLoanAccounts'], s['scAnnualAccounts']],
               },
               {
                 icon: <ClipboardList size={18} />,
-                title: 'Proposals',
-                items: ['Loan Proposal', 'Business Proposal'],
+                title: s['scProposals'],
+                items: [s['scLoanProposal'], s['scBusinessProposal']],
               },
               {
                 icon: <Package size={18} />,
-                title: 'Inventory Management',
-                items: ['Stock Verification', 'Digital Bar Stock Counts'],
+                title: s['scInventory'],
+                items: [s['scStockVerification'], s['scDigitalStock']],
               },
               {
                 icon: <Receipt size={18} />,
-                title: 'Tax',
-                items: ['Income Tax Filing', 'Income Tax Registration', 'VAT Consultations', 'Tax Consultations'],
+                title: s['scTaxCategory'],
+                items: [s['scIncomeTaxFiling'], s['scIncomeTaxReg'], s['scVatConsult'], s['scTaxConsult']],
               },
               {
                 icon: <Landmark size={18} />,
-                title: 'Company Registrations',
-                items: ['Business Registration', 'Charity Registration'],
+                title: s['scCompanyReg'],
+                items: [s['scBusinessReg'], s['scCharityReg']],
               },
               {
                 icon: <FileEdit size={18} />,
-                title: 'Company Secretarial Works',
-                items: ['Annual Return Filing', 'Secretary Services'],
+                title: s['scSecretarial'],
+                items: [s['scAnnualReturn'], s['scSecretary']],
               },
               {
                 icon: <Home size={18} />,
-                title: 'Real Estates',
-                items: ['Deal Advisory'],
+                title: s['scRealEstate'],
+                items: [s['scDealAdvisory']],
               },
             ].map(cat => (
               <div key={cat.title} className="section-card">
@@ -183,7 +185,7 @@ const ServicesPage: React.FC = () => {
             borderRadius: '20px',
           }}
         >
-          <div className="section-label">GET STARTED</div>
+          <div className="section-label">{s['getStarted']?.toUpperCase() || 'GET STARTED'}</div>
           <h2
             style={{
               fontSize: '28px',
@@ -192,7 +194,7 @@ const ServicesPage: React.FC = () => {
               margin: '8px 0 12px',
             }}
           >
-            Ready to File Your Taxes?
+            {s['readyToFile']}
           </h2>
           <p
             style={{
@@ -204,7 +206,7 @@ const ServicesPage: React.FC = () => {
               lineHeight: 1.6,
             }}
           >
-            Create your account in minutes and let our platform handle your tax compliance.
+            {s['readyToFileDesc']}
           </p>
           <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button className="btn-primary" onClick={() => navigate('/verify')}>

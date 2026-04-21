@@ -1,84 +1,48 @@
-﻿import React from 'react';
+import React from 'react';
 import { Lock, ClipboardList, Scale, Shield, CheckCircle2, CalendarDays, Users, Globe } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-
-const LEGAL_SECTIONS: { icon: React.ReactNode; titleKey: string; content: string[] }[] = [
-  {
-    icon: <Lock size={22} />,
-    titleKey: 'pdpaTitle',
-    content: [
-      'We are fully compliant with the Personal Data Protection Act No. 9 of 2022 (Sri Lanka).',
-      'Your data is collected only with your explicit consent and used solely for the purposes you have agreed to.',
-      'We implement technical and organizational measures to protect your data against unauthorized access, loss, or alteration.',
-      'You may withdraw your consent at any time by contacting us at privacy@matrixinvestments.lk.',
-    ],
-  },
-  {
-    icon: <ClipboardList size={22} />,
-    titleKey: 'privacyPolicyFull',
-    content: [
-      'We collect: NIC number, mobile number, email address, full name, location data, and tax-related financial information.',
-      'We do NOT sell, rent, or share your personal data with third parties without your consent, except where required by law.',
-      'Data is stored on encrypted servers with regular backups. Access is role-based and audit-logged.',
-      'Cookies are used only for session management and do not track personal activity outside our platform.',
-    ],
-  },
-  {
-    icon: <Scale size={22} />,
-    titleKey: 'termsOfServiceFull',
-    content: [
-      'By using MyTax, you agree to provide accurate and truthful information for tax filing purposes.',
-      'Matrix Investments PLC is not liable for tax penalties arising from inaccurate information provided by users.',
-      'Unauthorized use, reverse engineering, or misuse of the platform will result in account termination.',
-      'Services marked as "Paid" are subject to applicable fees as published on the platform.',
-    ],
-  },
-  {
-    icon: <Shield size={22} />,
-    titleKey: 'dataProtection',
-    content: [
-      'All data transmissions are encrypted using TLS 1.2+.',
-      'Passwords are hashed using industry-standard algorithms and never stored in plain text.',
-      'Two-factor authentication (OTP) is required for all account access.',
-      'Regular security audits are performed by our compliance team.',
-    ],
-  },
-  {
-    icon: <CheckCircle2 size={22} />,
-    titleKey: 'consentFramework',
-    content: [
-      'On registration, users provide explicit consent for data collection and processing.',
-      'Consent is recorded with timestamp, user identity, and scope of permission.',
-      'Users can view, update, or revoke their consent at any time via Account Settings.',
-      'All consent records are maintained in our non-editable audit log as required by PDPA.',
-    ],
-  },
-  {
-    icon: <CalendarDays size={22} />,
-    titleKey: 'dataRetention',
-    content: [
-      'Active account data is retained for the duration of the client relationship.',
-      'Tax filing records are retained for a minimum of 5 years as required by IRD regulations.',
-      'Deleted account data is purged from production systems within 30 days.',
-      'Backup copies are deleted within 90 days of the production purge.',
-    ],
-  },
-  {
-    icon: <Users size={22} />,
-    titleKey: 'yourRights',
-    content: [
-      'Right to Access: Request a copy of all data we hold about you.',
-      'Right to Rectification: Correct any inaccurate information in your profile.',
-      'Right to Erasure: Request deletion of your account and associated data.',
-      'Right to Data Portability: Export your data in a machine-readable format.',
-      'Lodge complaints with the Data Protection Authority of Sri Lanka.',
-    ],
-  },
-];
 
 const LegalPage: React.FC = () => {
   const { s } = useLanguage();
   const [expanded, setExpanded] = React.useState<number | null>(0);
+
+  const LEGAL_SECTIONS = [
+    {
+      icon: <Lock size={22} />,
+      titleKey: 'pdpaTitle',
+      content: [s['legalPdpa1'], s['legalPdpa2'], s['legalPdpa3'], s['legalPdpa4']],
+    },
+    {
+      icon: <ClipboardList size={22} />,
+      titleKey: 'privacyPolicyFull',
+      content: [s['legalPriv1'], s['legalPriv2'], s['legalPriv3'], s['legalPriv4']],
+    },
+    {
+      icon: <Scale size={22} />,
+      titleKey: 'termsOfServiceFull',
+      content: [s['legalTerms1'], s['legalTerms2'], s['legalTerms3'], s['legalTerms4']],
+    },
+    {
+      icon: <Shield size={22} />,
+      titleKey: 'dataProtection',
+      content: [s['legalData1'], s['legalData2'], s['legalData3'], s['legalData4']],
+    },
+    {
+      icon: <CheckCircle2 size={22} />,
+      titleKey: 'consentFramework',
+      content: [s['legalConsent1'], s['legalConsent2'], s['legalConsent3'], s['legalConsent4']],
+    },
+    {
+      icon: <CalendarDays size={22} />,
+      titleKey: 'dataRetention',
+      content: [s['legalRet1'], s['legalRet2'], s['legalRet3'], s['legalRet4']],
+    },
+    {
+      icon: <Users size={22} />,
+      titleKey: 'yourRights',
+      content: [s['legalRight1'], s['legalRight2'], s['legalRight3'], s['legalRight4'], s['legalRight5']],
+    },
+  ];
 
   return (
     <main className="sub-page">
@@ -112,10 +76,10 @@ const LegalPage: React.FC = () => {
                 marginBottom: '4px',
               }}
             >
-              PDPA Compliant — Personal Data Protection Act No. 9 of 2022
+              {s['pdpaBadgeTitle']}
             </div>
             <p style={{ fontSize: '13px', color: 'rgba(234,234,234,0.55)', lineHeight: 1.6 }}>
-              Matrix Investments PLC is committed to full compliance with Sri Lanka's Personal Data Protection Act. Your privacy is our legal obligation.
+              {s['pdpaBadgeDesc']}
             </p>
           </div>
         </div>
@@ -205,7 +169,7 @@ const LegalPage: React.FC = () => {
             letterSpacing: '0.3px',
           }}
         >
-          Last updated: January 2026 &nbsp;·&nbsp; For queries: privacy@matrixinvestments.lk
+          {s['legalLastUpdated']} &nbsp;·&nbsp; For queries: privacy@matrixinvestments.lk
         </div>
       </div>
     </main>

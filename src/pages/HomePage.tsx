@@ -122,7 +122,7 @@ const HomePage: React.FC = () => {
                     <span
                       className={`service-card__tag ${svc.paid ? "tag-paid" : "tag-free"}`}
                     >
-                      {svc.paid ? "Paid" : "Free"}
+                      {svc.paid ? s["paid"] : s["free"]}
                     </span>
                   )}
                 </div>
@@ -286,7 +286,7 @@ const HomePage: React.FC = () => {
               marginTop: "28px",
             }}
           >
-            {s["skip"]} — Full guide content coming soon
+            {s["skip"]} — {s["guideNote"]}
           </p>
         </div>
       </section>
