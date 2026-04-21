@@ -16,6 +16,14 @@
   font-display: swap;
 }
 
+ @font-face {
+  font-family: 'InstrumentSerif';
+  src: url('/fonts/InstrumentSerif-Regular.ttf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ============================================================
    RESET & VARIABLES
    ============================================================ */
@@ -31,7 +39,7 @@
   --black: #000000;
   --card-bg: #0D0D0D;
   --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  --font-brand: 'SoraCarnelDemoRegular', 'DM Serif Display', serif;
+  --font-brand: 'InstrumentSeri', 'DM Serif Display', serif;
 }
 
 html, body {
