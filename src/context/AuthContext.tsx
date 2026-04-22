@@ -34,6 +34,7 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 const VERIFICATION_KEY = 'mytax_verification_state_v1';
 const USER_KEY = 'mytax_logged_user_v1';
+const USER_TOKEN_KEY = 'mytax_user_token';
 
 const defaultVerificationState: VerificationState = {
   nic: '',
@@ -124,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setVerification(defaultVerificationState);
     sessionStorage.removeItem(USER_KEY);
     sessionStorage.removeItem(VERIFICATION_KEY);
+    sessionStorage.removeItem(USER_TOKEN_KEY);
   };
 
   return (

@@ -45,6 +45,16 @@ const PostLoginModulesPage: React.FC = () => {
       return;
     }
 
+    if (code === 'M2') {
+      navigate('/dashboard/m2');
+      return;
+    }
+
+    if (code === 'M7') {
+      navigate('/dashboard/m7');
+      return;
+    }
+
     showSnack(`${code} module will be enabled soon.`);
   };
 

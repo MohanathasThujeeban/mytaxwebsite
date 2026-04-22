@@ -115,6 +115,8 @@ const RegisterPage: React.FC = () => {
     })
       .then(res => {
         setLoading(false);
+        sessionStorage.removeItem('mytax_admin_token');
+        sessionStorage.setItem('mytax_user_token', res.token);
         const u = res.user as Record<string, unknown>;
         login({
           nic: (u.nic as string) || verification.nic,

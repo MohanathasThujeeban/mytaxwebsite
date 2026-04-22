@@ -4,6 +4,22 @@ interface ApiError extends Error {
   status?: number;
 }
 
+const parseJson = async (res: Response): Promise<unknown> => {
+  try {
+    return await res.json();
+  } catch {
+    return undefined;
+  }
+};
+
+const throwApiError = (res: Response, data: unknown): never => {
+  const err = new Error(
+    (data as { message?: string })?.message || `Request failed (${res.status})`
+  ) as ApiError;
+  err.status = res.status;
+  throw err;
+};
+
 const request = async <T>(path: string, body: Record<string, unknown>): Promise<T> => {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -11,19 +27,10 @@ const request = async <T>(path: string, body: Record<string, unknown>): Promise<
     body: JSON.stringify(body),
   });
 
-  let data: unknown;
-  try {
-    data = await res.json();
-  } catch {
-    // ignore JSON parse errors; handled below
-  }
+  const data = await parseJson(res);
 
   if (!res.ok) {
-    const err = new Error(
-      (data as { message?: string })?.message || `Request failed (${res.status})`
-    ) as ApiError;
-    err.status = res.status;
-    throw err;
+    throwApiError(res, data);
   }
 
   return data as T;
@@ -37,19 +44,34 @@ const requestGet = async <T>(path: string, token?: string): Promise<T> => {
     },
   });
 
-  let data: unknown;
-  try {
-    data = await res.json();
-  } catch {
-    // ignore JSON parse errors; handled below
-  }
+  const data = await parseJson(res);
 
   if (!res.ok) {
-    const err = new Error(
-      (data as { message?: string })?.message || `Request failed (${res.status})`
-    ) as ApiError;
-    err.status = res.status;
-    throw err;
+    throwApiError(res, data);
+  }
+
+  return data as T;
+};
+
+const requestAuthed = async <T>(
+  path: string,
+  method: "POST" | "PATCH",
+  body: Record<string, unknown>,
+  token: string,
+): Promise<T> => {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await parseJson(res);
+
+  if (!res.ok) {
+    throwApiError(res, data);
   }
 
   return data as T;
@@ -84,4 +106,27 @@ export const api = {
 
   adminUsers: (token: string) =>
     requestGet<{ users: Record<string, unknown>[] }>("/admin/users", token),
+
+  adminTinApplications: (token: string) =>
+    requestGet<{ applications: Record<string, unknown>[] }>("/admin/tin-applications", token),
+
+  adminAssignTin: (token: string, applicationId: string, assignedTin: string) =>
+    requestAuthed<{ message: string; application: Record<string, unknown> }>(
+      `/admin/tin-applications/${encodeURIComponent(applicationId)}/assign-tin`,
+      "PATCH",
+      { assignedTin },
+      token,
+    ),
+
+  m7Latest: (token: string) =>
+    requestGet<{ application: Record<string, unknown> | null }>("/m7/latest", token),
+
+  m7SaveDraft: (token: string, payload: { application?: Record<string, unknown> }) =>
+    requestAuthed<{ message: string; application: Record<string, unknown> }>("/m7/draft", "POST", payload, token),
+
+  m7Submit: (token: string, payload: { application?: Record<string, unknown> }) =>
+    requestAuthed<{ message: string; application: Record<string, unknown> }>("/m7/submit", "POST", payload, token),
+
+  m2TinStatus: (token: string, nic: string) =>
+    requestGet<{ tinStatus: Record<string, unknown> }>(`/m2/status?nic=${encodeURIComponent(nic)}`, token),
 };

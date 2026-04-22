@@ -31,12 +31,14 @@ const LoginPage: React.FC = () => {
     api.login({ nic, password })
       .then(res => {
         if (res.role === 'admin') {
+          sessionStorage.removeItem('mytax_user_token');
           sessionStorage.setItem('mytax_admin_token', res.token);
           navigate('/admin/dashboard');
           return;
         }
 
         sessionStorage.removeItem('mytax_admin_token');
+        sessionStorage.setItem('mytax_user_token', res.token);
         const u = res.user as Record<string, unknown>;
         login({
           nic: (u.nic as string) || nic,

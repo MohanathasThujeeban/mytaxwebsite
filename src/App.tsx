@@ -11,6 +11,9 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import PostLoginModulesPage from './pages/PostLoginModulesPage';
 import M1TaxSubmissionPage from './pages/M1TaxSubmissionPage';
+import TinNumberStatusPage from './pages/TinNumberStatusPage';
+import TinCertificateApplicationPage from './pages/TinCertificateApplicationPage';
+import TinApplicationPaymentPage from './pages/TinApplicationPaymentPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AboutPage from './pages/AboutPage';
 import GroupCompaniesPage from './pages/GroupCompaniesPage';
@@ -35,6 +38,9 @@ const AppInner: React.FC = () => {
         <Route path="/dashboard/modules" element={<PostLoginModulesPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/dashboard/m1" element={<M1TaxSubmissionPage />} />
+        <Route path="/dashboard/m2" element={<TinNumberStatusPage />} />
+        <Route path="/dashboard/m7" element={<TinCertificateApplicationPage />} />
+        <Route path="/dashboard/m7/payment" element={<TinApplicationPaymentPage />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/group" element={<GroupCompaniesPage />} />

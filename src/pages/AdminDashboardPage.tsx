@@ -7,6 +7,7 @@ import {
   Eye,
   FileSpreadsheet,
   FileText,
+  IdCard,
   LogOut,
   RefreshCw,
   Search,
@@ -44,6 +45,21 @@ interface AdminUser {
   createdAt: Date | null;
 }
 
+interface TinApplication {
+  id: string;
+  nic: string;
+  status: 'draft' | 'submitted' | 'assigned';
+  fullName: string;
+  mobileNo: string;
+  emailAddress: string;
+  assignedTin: string;
+  paymentStatus: 'pending' | 'completed';
+  requestedAt: string | null;
+  assignedAt: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+
 const asString = (value: unknown): string => (typeof value === 'string' ? value : '');
 
 const asDate = (value: unknown): Date | null => {
@@ -67,6 +83,34 @@ const toUser = (raw: Record<string, unknown>): AdminUser => ({
   addressLine1: asString(raw.addressLine1),
   addressLine2: asString(raw.addressLine2),
   createdAt: asDate(raw.createdAt),
+});
+
+const normalizeTinStatus = (value: unknown): TinApplication['status'] => {
+  const status = asString(value).toLowerCase();
+  if (status === 'submitted') {
+    return 'submitted';
+  }
+
+  if (status === 'assigned') {
+    return 'assigned';
+  }
+
+  return 'draft';
+};
+
+const toTinApplication = (raw: Record<string, unknown>): TinApplication => ({
+  id: asString(raw.id),
+  nic: asString(raw.nic),
+  status: normalizeTinStatus(raw.status),
+  fullName: asString(raw.fullName),
+  mobileNo: asString(raw.mobileNo),
+  emailAddress: asString(raw.emailAddress),
+  assignedTin: asString(raw.assignedTin),
+  paymentStatus: asString(raw.paymentStatus).toLowerCase() === 'completed' ? 'completed' : 'pending',
+  requestedAt: asString(raw.requestedAt) || null,
+  assignedAt: asString(raw.assignedAt) || null,
+  updatedAt: asString(raw.updatedAt),
+  createdAt: asString(raw.createdAt),
 });
 
 const formatDate = (date: Date | string | null): string => {
@@ -99,7 +143,22 @@ const isPdfDoc = (fileType: string | undefined, fileName: string | undefined): b
 const statusClass = (status: 'draft' | 'submitted'): string =>
   status === 'submitted' ? 'm1-status-chip success' : 'm1-status-chip warning';
 
-type AdminView = 'users' | 'm1';
+const tinStatusClass = (status: TinApplication['status']): string => {
+  if (status === 'assigned') {
+    return 'm1-status-chip success';
+  }
+
+  if (status === 'submitted') {
+    return 'm1-status-chip warning';
+  }
+
+  return 'm1-status-chip';
+};
+
+const tinPaymentClass = (status: TinApplication['paymentStatus']): string =>
+  status === 'completed' ? 'm1-status-chip success' : 'm1-status-chip warning';
+
+type AdminView = 'users' | 'm1' | 'tin';
 
 const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -109,10 +168,15 @@ const AdminDashboardPage: React.FC = () => {
   const [activeView, setActiveView] = useState<AdminView>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [submissions, setSubmissions] = useState<M1SubmissionRecord[]>([]);
+  const [tinApplications, setTinApplications] = useState<TinApplication[]>([]);
   const [userQuery, setUserQuery] = useState('');
   const [m1Query, setM1Query] = useState('');
+  const [tinQuery, setTinQuery] = useState('');
   const [selectedUserNic, setSelectedUserNic] = useState('');
   const [selectedSubmissionId, setSelectedSubmissionId] = useState('');
+  const [selectedTinApplicationId, setSelectedTinApplicationId] = useState('');
+  const [tinAssignValue, setTinAssignValue] = useState('');
+  const [assigningTin, setAssigningTin] = useState(false);
   const [selectedDocumentKey, setSelectedDocumentKey] = useState('');
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
 
@@ -133,7 +197,7 @@ const AdminDashboardPage: React.FC = () => {
       setSelectedSubmissionId(prev => prev || localSubmissions[0].id);
     }
 
-    api.adminUsers(token)
+    const usersPromise = api.adminUsers(token)
       .then(res => {
         const list = Array.isArray(res.users) ? res.users.map(item => toUser(item)) : [];
         setUsers(list);
@@ -142,8 +206,24 @@ const AdminDashboardPage: React.FC = () => {
         }
       })
       .catch(err => {
-        setWarning(err?.message || 'Unable to load registered users from backend.');
+        const message = err?.message || 'Unable to load registered users from backend.';
+        setWarning(prev => (prev ? `${prev} ${message}` : message));
+      });
+
+    const tinPromise = api.adminTinApplications(token)
+      .then(res => {
+        const list = Array.isArray(res.applications) ? res.applications.map(item => toTinApplication(item)) : [];
+        setTinApplications(list);
+        if (list.length) {
+          setSelectedTinApplicationId(prev => prev || list[0].id);
+        }
       })
+      .catch(err => {
+        const message = err?.message || 'Unable to load TIN applications from backend.';
+        setWarning(prev => (prev ? `${prev} ${message}` : message));
+      });
+
+    Promise.allSettled([usersPromise, tinPromise])
       .finally(() => setLoading(false));
   };
 
@@ -223,6 +303,23 @@ const AdminDashboardPage: React.FC = () => {
     });
   }, [m1Query, submissions]);
 
+  const filteredTinApplications = useMemo(() => {
+    const q = tinQuery.trim().toLowerCase();
+    if (!q) {
+      return tinApplications;
+    }
+
+    return tinApplications.filter(item => {
+      return (
+        item.nic.toLowerCase().includes(q) ||
+        item.fullName.toLowerCase().includes(q) ||
+        item.mobileNo.toLowerCase().includes(q) ||
+        item.emailAddress.toLowerCase().includes(q) ||
+        item.assignedTin.toLowerCase().includes(q)
+      );
+    });
+  }, [tinApplications, tinQuery]);
+
   const selectedSubmission = useMemo(() => {
     if (!filteredSubmissions.length) {
       return null;
@@ -236,6 +333,29 @@ const AdminDashboardPage: React.FC = () => {
       setSelectedSubmissionId(selectedSubmission.id);
     }
   }, [selectedSubmission, selectedSubmissionId]);
+
+  const selectedTinApplication = useMemo(() => {
+    if (!filteredTinApplications.length) {
+      return null;
+    }
+
+    return filteredTinApplications.find(item => item.id === selectedTinApplicationId) || filteredTinApplications[0];
+  }, [filteredTinApplications, selectedTinApplicationId]);
+
+  useEffect(() => {
+    if (selectedTinApplication && selectedTinApplication.id !== selectedTinApplicationId) {
+      setSelectedTinApplicationId(selectedTinApplication.id);
+    }
+  }, [selectedTinApplication, selectedTinApplicationId]);
+
+  useEffect(() => {
+    if (selectedTinApplication) {
+      setTinAssignValue(selectedTinApplication.assignedTin || '');
+      return;
+    }
+
+    setTinAssignValue('');
+  }, [selectedTinApplication?.id]);
 
   const selectedSubmissionDocuments = useMemo(() => {
     if (!selectedSubmission) {
@@ -326,6 +446,20 @@ const AdminDashboardPage: React.FC = () => {
 
   const m1UserCount = useMemo(() => submissionsByNic.size, [submissionsByNic]);
 
+  const tinMetrics = useMemo(() => {
+    const total = tinApplications.length;
+    const assigned = tinApplications.filter(item => item.status === 'assigned' || item.assignedTin.trim().length > 0).length;
+    const inProgress = total - assigned;
+    const submitted = tinApplications.filter(item => item.status === 'submitted').length;
+
+    return {
+      total,
+      assigned,
+      inProgress,
+      submitted,
+    };
+  }, [tinApplications]);
+
   const usersWithRequests = useMemo(
     () => users.filter(item => (submissionsByNic.get(nicKey(item.nic)) || []).length > 0).length,
     [submissionsByNic, users]
@@ -356,6 +490,40 @@ const AdminDashboardPage: React.FC = () => {
 
     setError('');
     downloadM1SubmissionsExcel(submissions);
+  };
+
+  const handleAssignTinNumber = () => {
+    if (!selectedTinApplication) {
+      setError('Select a TIN application first.');
+      return;
+    }
+
+    const assignedTin = tinAssignValue.trim().toUpperCase();
+    if (!assignedTin) {
+      setError('TIN number is required to assign.');
+      return;
+    }
+
+    const token = sessionStorage.getItem('mytax_admin_token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    setAssigningTin(true);
+    setError('');
+
+    api.adminAssignTin(token, selectedTinApplication.id, assignedTin)
+      .then(res => {
+        const updated = toTinApplication(res.application);
+        setTinApplications(prev => prev.map(item => (item.id === updated.id ? updated : item)));
+        setTinAssignValue(updated.assignedTin || assignedTin);
+        setWarning(`TIN ${assignedTin} assigned to NIC ${updated.nic}.`);
+      })
+      .catch(err => {
+        setError(err?.message || 'Unable to assign TIN number.');
+      })
+      .finally(() => setAssigningTin(false));
   };
 
   const handleDocumentVerification = (documentKey: string, verificationStatus: DocumentVerificationStatus) => {
@@ -466,7 +634,28 @@ const AdminDashboardPage: React.FC = () => {
     ];
   }, [selectedSubmissionUser]);
 
+  const tinRows = useMemo(() => {
+    if (!selectedTinApplication) {
+      return [] as Array<{ label: string; value: string }>;
+    }
+
+    return [
+      { label: 'Request ID', value: display(selectedTinApplication.id) },
+      { label: 'NIC', value: display(selectedTinApplication.nic) },
+      { label: 'Full Name', value: display(selectedTinApplication.fullName) },
+      { label: 'Mobile No', value: display(selectedTinApplication.mobileNo) },
+      { label: 'Email', value: display(selectedTinApplication.emailAddress) },
+      { label: 'Status', value: selectedTinApplication.status },
+      { label: 'Assigned TIN', value: display(selectedTinApplication.assignedTin) },
+      { label: 'Payment', value: selectedTinApplication.paymentStatus },
+      { label: 'Requested At', value: formatDate(selectedTinApplication.requestedAt) },
+      { label: 'Assigned At', value: formatDate(selectedTinApplication.assignedAt) },
+      { label: 'Last Updated', value: formatDate(selectedTinApplication.updatedAt) },
+    ];
+  }, [selectedTinApplication]);
+
   const recentRecords = useMemo(() => submissions.slice(0, 6), [submissions]);
+  const recentTinApplications = useMemo(() => tinApplications.slice(0, 6), [tinApplications]);
 
   const recentUsers = useMemo(() => {
     return [...users]
@@ -513,6 +702,13 @@ const AdminDashboardPage: React.FC = () => {
                 >
                   <FileText size={15} /> M1
                 </button>
+                <button
+                  type="button"
+                  className={`admin-rail__item${activeView === 'tin' ? ' active' : ''}`}
+                  onClick={() => setActiveView('tin')}
+                >
+                  <IdCard size={15} /> TIN Applications
+                </button>
               </div>
 
               <button className="admin-rail__logout" onClick={handleLogout}>
@@ -524,12 +720,18 @@ const AdminDashboardPage: React.FC = () => {
               <header className="admin-board__top">
                 <div>
                   <p className="admin-board__eyebrow">
-                    {activeView === 'users' ? 'User Registry Desk' : 'M1 Filing Desk'}
+                    {activeView === 'users'
+                      ? 'User Registry Desk'
+                      : activeView === 'm1'
+                        ? 'M1 Filing Desk'
+                        : 'TIN Applications Desk'}
                   </p>
                   <h1>
                     {activeView === 'users'
                       ? 'Registered Users & Requested Services'
-                      : 'M1 Tax File Users & Submissions'}
+                      : activeView === 'm1'
+                        ? 'M1 Tax File Users & Submissions'
+                        : 'TIN Applications & Manual TIN Assignment'}
                   </h1>
                 </div>
 
@@ -576,7 +778,7 @@ const AdminDashboardPage: React.FC = () => {
                       <strong>{metrics.total}</strong>
                     </div>
                   </>
-                ) : (
+                ) : activeView === 'm1' ? (
                   <>
                     <div className="admin-kpi">
                       <span><Users size={16} /> M1 Tax File Users</span>
@@ -593,6 +795,25 @@ const AdminDashboardPage: React.FC = () => {
                     <div className="admin-kpi">
                       <span><BarChart3 size={16} /> Draft</span>
                       <strong>{metrics.draft}</strong>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="admin-kpi">
+                      <span><IdCard size={16} /> Total TIN Requests</span>
+                      <strong>{tinMetrics.total}</strong>
+                    </div>
+                    <div className="admin-kpi">
+                      <span><BarChart3 size={16} /> Assigned</span>
+                      <strong>{tinMetrics.assigned}</strong>
+                    </div>
+                    <div className="admin-kpi">
+                      <span><BarChart3 size={16} /> In Progress</span>
+                      <strong>{tinMetrics.inProgress}</strong>
+                    </div>
+                    <div className="admin-kpi">
+                      <span><BarChart3 size={16} /> Submitted</span>
+                      <strong>{tinMetrics.submitted}</strong>
                     </div>
                   </>
                 )}
@@ -699,7 +920,7 @@ const AdminDashboardPage: React.FC = () => {
                       )}
                     </section>
                   </>
-                ) : (
+                ) : activeView === 'm1' ? (
                   <>
                     <section className="admin-card">
                       <div className="admin-card__head">
@@ -818,6 +1039,89 @@ const AdminDashboardPage: React.FC = () => {
                       )}
                     </section>
                   </>
+                ) : (
+                  <>
+                    <section className="admin-card">
+                      <div className="admin-card__head">
+                        <h3>TIN Applications</h3>
+                        <strong>{filteredTinApplications.length} shown</strong>
+                      </div>
+
+                      <div className="input-wrapper admin-search" style={{ marginBottom: '12px' }}>
+                        <Search size={14} className="input-icon" />
+                        <input
+                          placeholder="Search by NIC, name, mobile, email or TIN"
+                          value={tinQuery}
+                          onChange={e => setTinQuery(e.target.value)}
+                        />
+                      </div>
+
+                      {!filteredTinApplications.length ? (
+                        <p className="admin-empty">No TIN applications found.</p>
+                      ) : (
+                        <div className="admin-record-list">
+                          {filteredTinApplications.map(record => {
+                            const selected = selectedTinApplication?.id === record.id;
+                            return (
+                              <button
+                                key={record.id}
+                                type="button"
+                                className={`admin-record-item${selected ? ' selected' : ''}`}
+                                onClick={() => setSelectedTinApplicationId(record.id)}
+                              >
+                                <div className="admin-record-item__name">{display(record.fullName || 'Unknown')}</div>
+                                <div className="admin-record-item__meta">{display(record.nic)}</div>
+                                <div className="admin-record-item__meta">{display(record.mobileNo)}</div>
+                                <div className="admin-record-item__chips">
+                                  <span className={tinStatusClass(record.status)}>{record.status}</span>
+                                  <span className={tinPaymentClass(record.paymentStatus)}>{record.paymentStatus}</span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="admin-card">
+                      <div className="admin-card__head">
+                        <h3>TIN Application Details</h3>
+                        <strong>{selectedTinApplication ? 'Active' : 'No selection'}</strong>
+                      </div>
+
+                      {!selectedTinApplication ? (
+                        <p className="admin-empty">Select a TIN application to view details.</p>
+                      ) : (
+                        <div className="admin-stack">
+                          <div className="admin-detail-grid">
+                            {tinRows.map(row => (
+                              <div key={row.label} className="admin-detail-tile">
+                                <span>{row.label}</span>
+                                <strong>{row.value}</strong>
+                              </div>
+                            ))}
+                          </div>
+
+                          <p className="admin-section-label">Assign / Update TIN Number</p>
+                          <div className="input-wrapper admin-search">
+                            <IdCard size={14} className="input-icon" />
+                            <input
+                              placeholder="Enter TIN number"
+                              value={tinAssignValue}
+                              onChange={e => setTinAssignValue(e.target.value.toUpperCase())}
+                            />
+                          </div>
+
+                          <div>
+                            <button className="btn-outline" onClick={handleAssignTinNumber} disabled={assigningTin}>
+                              {assigningTin ? <span className="spinner" /> : <CheckCircle2 size={14} style={{ marginRight: 6 }} />}
+                              Assign TIN Number
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </section>
+                  </>
                 )}
               </div>
 
@@ -901,7 +1205,7 @@ const AdminDashboardPage: React.FC = () => {
                     )}
                   </section>
                 </>
-              ) : (
+              ) : activeView === 'm1' ? (
                 <>
                   <section className="admin-card admin-card--compact">
                     <div className="admin-card__head">
@@ -978,6 +1282,88 @@ const AdminDashboardPage: React.FC = () => {
                               <span className={statusClass(record.status)}>{record.status}</span>
                             </div>
                             <p>{record.id}</p>
+                            <time>{formatDate(record.updatedAt)}</time>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </>
+              ) : (
+                <>
+                  <section className="admin-card admin-card--compact">
+                    <div className="admin-card__head">
+                      <h3>TIN Assignment Health</h3>
+                      <strong>{tinMetrics.total}</strong>
+                    </div>
+
+                    <div className="admin-pill-grid">
+                      <div className="admin-pill-stat">
+                        <span>Total</span>
+                        <strong>{tinMetrics.total}</strong>
+                      </div>
+                      <div className="admin-pill-stat">
+                        <span>Assigned</span>
+                        <strong>{tinMetrics.assigned}</strong>
+                      </div>
+                      <div className="admin-pill-stat">
+                        <span>In Progress</span>
+                        <strong>{tinMetrics.inProgress}</strong>
+                      </div>
+                      <div className="admin-pill-stat">
+                        <span>Submitted</span>
+                        <strong>{tinMetrics.submitted}</strong>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="admin-card admin-card--compact">
+                    <div className="admin-card__head">
+                      <h3>Selected NIC Snapshot</h3>
+                      <strong>{selectedTinApplication ? 'Active' : '-'}</strong>
+                    </div>
+
+                    {!selectedTinApplication ? (
+                      <p className="admin-empty">Select an application to preview assignment details.</p>
+                    ) : (
+                      <div className="admin-detail-grid">
+                        <div className="admin-detail-tile">
+                          <span>NIC</span>
+                          <strong>{display(selectedTinApplication.nic)}</strong>
+                        </div>
+                        <div className="admin-detail-tile">
+                          <span>Assigned TIN</span>
+                          <strong>{display(selectedTinApplication.assignedTin)}</strong>
+                        </div>
+                        <div className="admin-detail-tile">
+                          <span>Status</span>
+                          <strong>{selectedTinApplication.status}</strong>
+                        </div>
+                        <div className="admin-detail-tile">
+                          <span>Payment</span>
+                          <strong>{selectedTinApplication.paymentStatus}</strong>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="admin-card admin-card--compact">
+                    <div className="admin-card__head">
+                      <h3>Recent TIN Activity</h3>
+                      <strong>{recentTinApplications.length}</strong>
+                    </div>
+
+                    {!recentTinApplications.length ? (
+                      <p className="admin-empty">No TIN application activity yet.</p>
+                    ) : (
+                      <ul className="admin-activity-list">
+                        {recentTinApplications.map(record => (
+                          <li key={record.id} className="admin-activity-item">
+                            <div className="admin-activity-item__top">
+                              <strong>{display(record.fullName || record.nic)}</strong>
+                              <span className={tinStatusClass(record.status)}>{record.status}</span>
+                            </div>
+                            <p>{record.nic}</p>
                             <time>{formatDate(record.updatedAt)}</time>
                           </li>
                         ))}
