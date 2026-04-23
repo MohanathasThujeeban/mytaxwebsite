@@ -180,16 +180,20 @@ const AdminDashboardPage: React.FC = () => {
   const [selectedDocumentKey, setSelectedDocumentKey] = useState('');
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
 
-  const loadDashboard = () => {
+  const loadDashboard = (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
+
     const token = sessionStorage.getItem('mytax_admin_token');
     if (!token) {
       navigate('/login');
       return;
     }
 
-    setLoading(true);
-    setError('');
-    setWarning('');
+    if (!silent) {
+      setLoading(true);
+      setError('');
+      setWarning('');
+    }
 
     const localSubmissions = getAllM1Submissions();
     setSubmissions(localSubmissions);
@@ -206,8 +210,10 @@ const AdminDashboardPage: React.FC = () => {
         }
       })
       .catch(err => {
-        const message = err?.message || 'Unable to load registered users from backend.';
-        setWarning(prev => (prev ? `${prev} ${message}` : message));
+        if (!silent) {
+          const message = err?.message || 'Unable to load registered users from backend.';
+          setWarning(prev => (prev ? `${prev} ${message}` : message));
+        }
       });
 
     const tinPromise = api.adminTinApplications(token)
@@ -219,16 +225,31 @@ const AdminDashboardPage: React.FC = () => {
         }
       })
       .catch(err => {
-        const message = err?.message || 'Unable to load TIN applications from backend.';
-        setWarning(prev => (prev ? `${prev} ${message}` : message));
+        if (!silent) {
+          const message = err?.message || 'Unable to load TIN applications from backend.';
+          setWarning(prev => (prev ? `${prev} ${message}` : message));
+        }
       });
 
     Promise.allSettled([usersPromise, tinPromise])
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!silent) {
+          setLoading(false);
+        }
+      });
   };
 
   useEffect(() => {
     loadDashboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      loadDashboard({ silent: true });
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -736,7 +757,7 @@ const AdminDashboardPage: React.FC = () => {
                 </div>
 
                 <div className="admin-board__actions">
-                  <button className="btn-outline" onClick={loadDashboard}>
+                  <button className="btn-outline" onClick={() => loadDashboard()}>
                     <RefreshCw size={14} style={{ marginRight: 6 }} /> Refresh
                   </button>
                   {activeView === 'm1' && (

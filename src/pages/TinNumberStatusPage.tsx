@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, BadgeCheck, Clock3, CreditCard, Search } from 'lucide-react';
+import { ArrowRight, BadgeCheck, BookOpen, Clock3, CreditCard, Home, LogOut, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 
@@ -19,6 +19,8 @@ const USER_TOKEN_KEY = 'mytax_user_token';
 
 const asString = (value: unknown): string => (typeof value === 'string' ? value : '');
 
+const normalizeNic = (value: string): string => value.trim().toUpperCase();
+
 const normalizeLookupStatus = (value: unknown): TinLookupStatus => {
   const status = asString(value).toLowerCase();
   if (status === 'assigned') {
@@ -33,7 +35,7 @@ const normalizeLookupStatus = (value: unknown): TinLookupStatus => {
 };
 
 const toTinStatus = (raw: Record<string, unknown>): TinStatusDto => ({
-  nic: asString(raw.nic),
+  nic: normalizeNic(asString(raw.nic)),
   status: normalizeLookupStatus(raw.status),
   tinNumber: asString(raw.tinNumber) || null,
   message: asString(raw.message),
@@ -66,19 +68,84 @@ const statusClass = (status: TinLookupStatus): string => {
   return 'm1-status-chip';
 };
 
+const statusLabel = (status: TinLookupStatus): string => {
+  if (status === 'assigned') {
+    return 'ASSIGNED';
+  }
+
+  if (status === 'in_progress') {
+    return 'IN PROGRESS';
+  }
+
+  return 'NOT FOUND';
+};
+
+const statusSummary = (status: TinLookupStatus): string => {
+  if (status === 'assigned') {
+    return 'You are a registered tax payer.';
+  }
+
+  if (status === 'in_progress') {
+    return 'Your TIN registration is currently under review.';
+  }
+
+  return 'No active TIN record found for your NIC.';
+};
+
 const TinNumberStatusPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
-  const [nic, setNic] = useState(user?.nic || '');
+  const [nic, setNic] = useState(normalizeNic(user?.nic || ''));
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [result, setResult] = useState<TinStatusDto | null>(null);
+  const autoLookupDoneRef = useRef(false);
 
   const showSnack = (message: string) => {
     setSnack(message);
     window.setTimeout(() => setSnack(''), 2800);
+  };
+
+  const verifiedNic = useMemo(() => normalizeNic(user?.nic || ''), [user?.nic]);
+  const typedNic = useMemo(() => normalizeNic(nic), [nic]);
+  const canCheck = useMemo(() => typedNic.length > 0, [typedNic]);
+
+  const runLookup = (targetNic: string, token: string, silent = false) => {
+    setChecking(true);
+    setError('');
+
+    api.m2TinStatus(token, targetNic)
+      .then(res => {
+        const next = toTinStatus(res.tinStatus || {});
+        const safeResult: TinStatusDto = {
+          ...next,
+          nic: next.nic || targetNic,
+        };
+
+        setResult(safeResult);
+
+        if (silent) {
+          return;
+        }
+
+        if (safeResult.status === 'assigned') {
+          showSnack('TIN found for your account.');
+          return;
+        }
+
+        if (safeResult.status === 'in_progress') {
+          showSnack('Your TIN registration is still in progress.');
+          return;
+        }
+
+        showSnack('No active TIN found. You can register now.');
+      })
+      .catch(err => {
+        setError(err?.message || 'Unable to fetch TIN status.');
+      })
+      .finally(() => setChecking(false));
   };
 
   useEffect(() => {
@@ -87,18 +154,37 @@ const TinNumberStatusPage: React.FC = () => {
       return;
     }
 
-    setNic(user.nic);
-  }, [navigate, user]);
+    setNic(verifiedNic);
 
-  const canCheck = useMemo(() => nic.trim().length > 0, [nic]);
+    const token = sessionStorage.getItem(USER_TOKEN_KEY);
+    if (!token || !verifiedNic || autoLookupDoneRef.current) {
+      return;
+    }
+
+    autoLookupDoneRef.current = true;
+    runLookup(verifiedNic, token, true);
+  }, [navigate, user, verifiedNic]);
 
   if (!user) {
     return null;
   }
 
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
   const checkStatus = () => {
     if (!canCheck) {
       showSnack('Please enter your NIC number.');
+      return;
+    }
+
+    const enteredNic = normalizeNic(nic);
+
+    if (verifiedNic && enteredNic !== verifiedNic) {
+      setError(`Only your verified NIC can be checked (${verifiedNic}).`);
+      showSnack('Use your verified NIC to check status.');
       return;
     }
 
@@ -108,31 +194,36 @@ const TinNumberStatusPage: React.FC = () => {
       return;
     }
 
-    setChecking(true);
-    setError('');
-
-    api.m2TinStatus(token, nic.trim())
-      .then(res => {
-        const next = toTinStatus(res.tinStatus);
-        setResult(next);
-
-        if (next.status === 'assigned') {
-          showSnack('TIN number found.');
-          return;
-        }
-
-        if (next.status === 'in_progress') {
-          showSnack('Your application in progress.');
-          return;
-        }
-
-        showSnack('No TIN application found for this NIC.');
-      })
-      .catch(err => {
-        setError(err?.message || 'Unable to fetch TIN status.');
-      })
-      .finally(() => setChecking(false));
+    setNic(enteredNic);
+    runLookup(verifiedNic || enteredNic, token);
   };
+
+  const primaryAction = () => {
+    if (!result) {
+      return;
+    }
+
+    if (result.status === 'assigned') {
+      navigate('/dashboard/modules');
+      return;
+    }
+
+    navigate('/dashboard/m7');
+  };
+
+  const primaryActionLabel =
+    result?.status === 'assigned'
+      ? 'Back to Modules'
+      : result?.status === 'in_progress'
+        ? 'Continue TIN Application (M7)'
+        : 'Register as Tax Payer (M7)';
+
+  const guidanceMessage =
+    result?.status === 'assigned'
+      ? 'Your TIN is active. You can proceed with other tax services from your dashboard.'
+      : result?.status === 'in_progress'
+        ? 'Your request is already submitted. Open M7 if you need to review details.'
+        : 'Start tax payer registration through M7 to receive your TIN number.';
 
   return (
     <div className="dashboard">
@@ -143,7 +234,7 @@ const TinNumberStatusPage: React.FC = () => {
             <Search size={22} /> Check TIN Assignment Status
           </h1>
           <p>
-            Enter your NIC number to view whether your TIN number is assigned or still in progress.
+            View your TIN assignment status using the NIC linked to your verified user account.
           </p>
         </div>
         <img
@@ -168,9 +259,15 @@ const TinNumberStatusPage: React.FC = () => {
                 <input
                   value={nic}
                   onChange={e => setNic(e.target.value)}
+                  readOnly={Boolean(verifiedNic)}
                   placeholder="Enter NIC number"
                 />
               </div>
+              <p className="admin-empty" style={{ marginTop: '8px' }}>
+                {verifiedNic
+                  ? `Lookup is restricted to your verified NIC: ${verifiedNic}`
+                  : 'Enter the NIC linked to your verified account.'}
+              </p>
             </div>
             <div style={{ alignSelf: 'end' }}>
               <button type="button" className="btn-primary" onClick={checkStatus} disabled={checking || !canCheck}>
@@ -184,17 +281,27 @@ const TinNumberStatusPage: React.FC = () => {
           <div className="admin-panel__title">Status Result</div>
 
           {!result ? (
-            <p className="admin-empty">No lookup yet. Enter NIC and click Check Status.</p>
+            <p className="admin-empty">
+              No status record loaded yet. Click Check Status to refresh your latest TIN details.
+            </p>
           ) : (
             <div className="admin-stack">
               <div className="m1-status-row">
-                <span className={statusClass(result.status)}>{result.status.replace('_', ' ').toUpperCase()}</span>
+                <span className={statusClass(result.status)}>{statusLabel(result.status)}</span>
+              </div>
+
+              <div className="admin-detail-tile">
+                <span>Tax Payer Verification</span>
+                <strong>{statusSummary(result.status)}</strong>
+                <p style={{ marginTop: '8px', color: 'rgba(184,184,184,0.74)', fontSize: '12px', lineHeight: 1.6 }}>
+                  {guidanceMessage}
+                </p>
               </div>
 
               <div className="admin-detail-grid">
                 <div className="admin-detail-tile">
                   <span>NIC Number</span>
-                  <strong>{result.nic || '-'}</strong>
+                  <strong>{result.nic || verifiedNic || '-'}</strong>
                 </div>
                 <div className="admin-detail-tile">
                   <span>TIN Number</span>
@@ -216,28 +323,35 @@ const TinNumberStatusPage: React.FC = () => {
                   {result.status === 'assigned'
                     ? result.message || 'TIN number has been assigned.'
                     : result.status === 'in_progress'
-                      ? result.message || 'Your application in progress.'
-                      : result.message || 'No TIN application found for this NIC.'}
+                      ? result.message || 'Your TIN registration is currently in progress.'
+                      : result.message || 'No TIN registration found for your NIC.'}
                 </strong>
               </div>
 
-              {result.status !== 'assigned' && (
-                <div>
-                  <button type="button" className="btn-outline" onClick={() => navigate('/dashboard/m7')}>
-                    <ArrowRight size={14} style={{ marginRight: 6 }} /> Open TIN Application (M7)
-                  </button>
-                </div>
-              )}
+              <div className="m1-nav-row">
+                <button type="button" className="btn-primary" onClick={primaryAction}>
+                  {result.status === 'assigned'
+                    ? <Home size={14} style={{ marginRight: 6 }} />
+                    : <ArrowRight size={14} style={{ marginRight: 6 }} />}
+                  {primaryActionLabel}
+                </button>
+                <button type="button" className="btn-outline" onClick={() => navigate('/guide')}>
+                  <BookOpen size={14} style={{ marginRight: 6 }} /> Open User Guide
+                </button>
+                <button type="button" className="btn-outline" onClick={handleLogout}>
+                  <LogOut size={14} style={{ marginRight: 6 }} /> Logout
+                </button>
+              </div>
 
               {result.status === 'assigned' && (
                 <p className="admin-empty" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <BadgeCheck size={14} /> Your TIN is active and linked to this NIC.
+                  <BadgeCheck size={14} /> Your TIN is active and linked to your account.
                 </p>
               )}
 
               {result.status === 'in_progress' && (
                 <p className="admin-empty" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <Clock3 size={14} /> Your application in progress.
+                  <Clock3 size={14} /> Your registration request is in progress.
                 </p>
               )}
             </div>
