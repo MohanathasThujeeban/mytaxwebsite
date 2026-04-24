@@ -9,6 +9,7 @@ const LoginPage: React.FC = () => {
   const { s } = useLanguage();
   const { verification, login } = useAuth();
   const navigate = useNavigate();
+  const allowRegister = verification.isRegistered !== true;
 
   const [nic, setNic] = useState(verification.nic);
   const [password, setPassword] = useState('');
@@ -151,17 +152,18 @@ const LoginPage: React.FC = () => {
             {loading ? <span className="spinner" /> : '→'} {s['loginTitle']}
           </button>
 
-          {/* Register link */}
-          <p style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(184,184,184,0.5)' }}>
-            Don&apos;t have an account?{' '}
-            <button
-              className="passkey-link"
-              style={{ display: 'inline', textDecoration: 'underline' }}
-              onClick={() => navigate('/register')}
-            >
-              {s['registerNew']}
-            </button>
-          </p>
+          {allowRegister && (
+            <p style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(184,184,184,0.5)' }}>
+              Don&apos;t have an account?{' '}
+              <button
+                className="passkey-link"
+                style={{ display: 'inline', textDecoration: 'underline' }}
+                onClick={() => navigate('/register')}
+              >
+                {s['registerNew']}
+              </button>
+            </p>
+          )}
         </div>
 
         {/* Back to verify */}

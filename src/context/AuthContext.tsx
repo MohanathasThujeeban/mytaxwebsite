@@ -6,6 +6,7 @@ interface VerificationState {
   isOtpSent: boolean;
   isVerified: boolean;
   token: string | null;
+  isRegistered: boolean | null;
 }
 
 export interface UserInfo {
@@ -42,6 +43,7 @@ const defaultVerificationState: VerificationState = {
   isOtpSent: false,
   isVerified: false,
   token: null,
+  isRegistered: null,
 };
 
 const readFromSession = <T,>(key: string): T | null => {
@@ -73,6 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       isOtpSent: stored.isOtpSent === true,
       isVerified: stored.isVerified === true,
       token: typeof stored.token === 'string' ? stored.token : null,
+      isRegistered: typeof stored.isRegistered === 'boolean' ? stored.isRegistered : null,
     };
   });
 

@@ -20,6 +20,7 @@ const VerifyPage: React.FC = () => {
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
   const [otpSent, setOtpSent] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [isRegisteredAccount, setIsRegisteredAccount] = useState<boolean | null>(verification.isRegistered);
   const [loading, setLoading] = useState(false);
   const [snack, setSnack] = useState('');
   const [countdown, setCountdown] = useState(0);
@@ -70,18 +71,23 @@ const VerifyPage: React.FC = () => {
         setLoading(false);
 
         if (res.channel === 'bypass') {
+          const registered = res.isRegistered === true;
+          setIsRegisteredAccount(registered);
           updateVerification({
             nic: trimmedNic,
             mobile: trimmedMobile,
             isOtpSent: false,
             isVerified: true,
             token: res.token ?? null,
+            isRegistered: registered,
           });
           showSnack(res.message || 'Default account verified. Continue to login.');
           navigate('/login');
           return;
         }
 
+        const registered = res.isRegistered === true;
+        setIsRegisteredAccount(registered);
         setOtpSent(true);
         updateVerification({
           nic: trimmedNic,
@@ -89,6 +95,7 @@ const VerifyPage: React.FC = () => {
           isOtpSent: true,
           isVerified: false,
           token: null,
+          isRegistered: registered,
         });
         startCountdown();
         showSnack(res.message || `OTP sent to ${contact}`);
@@ -119,12 +126,15 @@ const VerifyPage: React.FC = () => {
       .then(res => {
         setLoading(false);
         setVerified(true);
+        const registered = res.isRegistered === true;
+        setIsRegisteredAccount(registered);
         updateVerification({
           isVerified: true,
           token: res.token,
           nic: trimmedNic,
           mobile: trimmedMobile,
           isOtpSent: true,
+          isRegistered: registered,
         });
         showSnack(res.message || 'Verified');
       })
@@ -312,7 +322,7 @@ const VerifyPage: React.FC = () => {
             >
               Verified!
             </p>
-            <p className="verified-text">{s['verifiedMessage']}</p>
+            <p className="verified-text">{isRegisteredAccount ? 'Account already exists. Please login to continue.' : s['verifiedMessage']}</p>
             <div className="verified-actions">
               <button
                 className="btn-primary"
@@ -321,13 +331,15 @@ const VerifyPage: React.FC = () => {
               >
                 {s['login']}
               </button>
-              <button
-                className="btn-outline"
-                style={{ flex: 1, minWidth: '130px' }}
-                onClick={() => navigate('/register')}
-              >
-                {s['registerNew']}
-              </button>
+              {isRegisteredAccount !== true && (
+                <button
+                  className="btn-outline"
+                  style={{ flex: 1, minWidth: '130px' }}
+                  onClick={() => navigate('/register')}
+                >
+                  {s['registerNew']}
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -79,13 +79,13 @@ const requestAuthed = async <T>(
 
 export const api = {
   requestOtp: (payload: { nic: string; phone?: string; email?: string }) =>
-    request<{ message: string; channel: string; expiresAt: string; token?: string }>("/auth/otp", payload),
+    request<{ message: string; channel: string; expiresAt: string; token?: string; isRegistered?: boolean }>("/auth/otp", payload),
 
   verifyOtp: (payload: { nic: string; code: string; email?: string }) =>
-    request<{ message: string; token: string }>("/auth/verify", payload),
+    request<{ message: string; token: string; isRegistered?: boolean }>("/auth/verify", payload),
 
   verifyOtpWithEmail: (payload: { nic: string; email: string; code: string }) =>
-    request<{ message: string; token: string }>("/auth/verify", payload),
+    request<{ message: string; token: string; isRegistered?: boolean }>("/auth/verify", payload),
 
   register: (payload: {
     nic: string;
