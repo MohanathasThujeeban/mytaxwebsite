@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Upload,
   Users,
   X,
   XCircle,
@@ -54,6 +55,7 @@ interface TinApplication {
   emailAddress: string;
   assignedTin: string;
   paymentStatus: 'pending' | 'completed';
+  paymentReference: string;
   requestedAt: string | null;
   assignedAt: string | null;
   updatedAt: string;
@@ -107,6 +109,7 @@ const toTinApplication = (raw: Record<string, unknown>): TinApplication => ({
   emailAddress: asString(raw.emailAddress),
   assignedTin: asString(raw.assignedTin),
   paymentStatus: asString(raw.paymentStatus).toLowerCase() === 'completed' ? 'completed' : 'pending',
+  paymentReference: asString(raw.paymentReference),
   requestedAt: asString(raw.requestedAt) || null,
   assignedAt: asString(raw.assignedAt) || null,
   updatedAt: asString(raw.updatedAt),
@@ -158,6 +161,8 @@ const tinStatusClass = (status: TinApplication['status']): string => {
 const tinPaymentClass = (status: TinApplication['paymentStatus']): string =>
   status === 'completed' ? 'm1-status-chip success' : 'm1-status-chip warning';
 
+const MAX_CERTIFICATE_UPLOAD_BYTES = 8 * 1024 * 1024;
+
 type AdminView = 'users' | 'm1' | 'tin';
 
 const AdminDashboardPage: React.FC = () => {
@@ -177,8 +182,13 @@ const AdminDashboardPage: React.FC = () => {
   const [selectedTinApplicationId, setSelectedTinApplicationId] = useState('');
   const [tinAssignValue, setTinAssignValue] = useState('');
   const [assigningTin, setAssigningTin] = useState(false);
+  const [tinCertificateFileName, setTinCertificateFileName] = useState('');
+  const [tinCertificateFileType, setTinCertificateFileType] = useState('');
+  const [tinCertificateFileDataUrl, setTinCertificateFileDataUrl] = useState('');
+  const [sendingTinCertificate, setSendingTinCertificate] = useState(false);
   const [selectedDocumentKey, setSelectedDocumentKey] = useState('');
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
+  const tinCertificateInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadDashboard = (options?: { silent?: boolean }) => {
     const silent = options?.silent === true;
@@ -216,7 +226,7 @@ const AdminDashboardPage: React.FC = () => {
         }
       });
 
-    const tinPromise = api.adminTinApplications(token)
+    const tinPromise = api.adminTinApplications(token, { paidOnly: true })
       .then(res => {
         const list = Array.isArray(res.applications) ? res.applications.map(item => toTinApplication(item)) : [];
         setTinApplications(list);
@@ -226,7 +236,7 @@ const AdminDashboardPage: React.FC = () => {
       })
       .catch(err => {
         if (!silent) {
-          const message = err?.message || 'Unable to load TIN applications from backend.';
+          const message = err?.message || 'Unable to load paid TIN certificate requests from backend.';
           setWarning(prev => (prev ? `${prev} ${message}` : message));
         }
       });
@@ -336,7 +346,8 @@ const AdminDashboardPage: React.FC = () => {
         item.fullName.toLowerCase().includes(q) ||
         item.mobileNo.toLowerCase().includes(q) ||
         item.emailAddress.toLowerCase().includes(q) ||
-        item.assignedTin.toLowerCase().includes(q)
+        item.assignedTin.toLowerCase().includes(q) ||
+        item.paymentReference.toLowerCase().includes(q)
       );
     });
   }, [tinApplications, tinQuery]);
@@ -372,10 +383,19 @@ const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     if (selectedTinApplication) {
       setTinAssignValue(selectedTinApplication.assignedTin || '');
+      setTinCertificateFileName('');
+      setTinCertificateFileType('');
+      setTinCertificateFileDataUrl('');
+      if (tinCertificateInputRef.current) {
+        tinCertificateInputRef.current.value = '';
+      }
       return;
     }
 
     setTinAssignValue('');
+    setTinCertificateFileName('');
+    setTinCertificateFileType('');
+    setTinCertificateFileDataUrl('');
   }, [selectedTinApplication?.id]);
 
   const selectedSubmissionDocuments = useMemo(() => {
@@ -547,6 +567,105 @@ const AdminDashboardPage: React.FC = () => {
       .finally(() => setAssigningTin(false));
   };
 
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string' && reader.result.length > 0) {
+          resolve(reader.result);
+          return;
+        }
+
+        reject(new Error('Unable to read selected file.'));
+      };
+      reader.onerror = () => reject(new Error('Unable to read selected file.'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleTinCertificateFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setTinCertificateFileName('');
+      setTinCertificateFileType('');
+      setTinCertificateFileDataUrl('');
+      return;
+    }
+
+    if (file.size > MAX_CERTIFICATE_UPLOAD_BYTES) {
+      setError('Certificate file is too large. Maximum supported size is 8MB.');
+      if (tinCertificateInputRef.current) {
+        tinCertificateInputRef.current.value = '';
+      }
+      return;
+    }
+
+    setError('');
+    readFileAsDataUrl(file)
+      .then(dataUrl => {
+        setTinCertificateFileName(file.name);
+        setTinCertificateFileType(file.type || 'application/octet-stream');
+        setTinCertificateFileDataUrl(dataUrl);
+      })
+      .catch(err => {
+        setError((err as Error).message || 'Unable to read certificate file.');
+        setTinCertificateFileName('');
+        setTinCertificateFileType('');
+        setTinCertificateFileDataUrl('');
+      });
+  };
+
+  const handleSendTinCertificate = () => {
+    if (!selectedTinApplication) {
+      setError('Select a TIN request first.');
+      return;
+    }
+
+    if (!tinCertificateFileName || !tinCertificateFileDataUrl) {
+      setError('Please upload a certificate file before sending.');
+      return;
+    }
+
+    const tinNumber = tinAssignValue.trim().toUpperCase() || selectedTinApplication.assignedTin.trim().toUpperCase();
+    if (!tinNumber) {
+      setError('TIN number is required before sending the certificate.');
+      return;
+    }
+
+    const token = sessionStorage.getItem('mytax_admin_token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    setSendingTinCertificate(true);
+    setError('');
+
+    api.adminSendTinCertificate(token, selectedTinApplication.id, {
+      tinNumber,
+      fileName: tinCertificateFileName,
+      fileType: tinCertificateFileType,
+      fileDataUrl: tinCertificateFileDataUrl,
+    })
+      .then(res => {
+        const updated = toTinApplication(res.application);
+        setTinApplications(prev => prev.map(item => (item.id === updated.id ? updated : item)));
+        setTinAssignValue(updated.assignedTin || tinNumber);
+        setWarning(
+          `TIN certificate sent to ${res.delivery.sentTo}. Payment Ref: ${res.delivery.paymentReference || updated.paymentReference || '-'}`
+        );
+        setTinCertificateFileName('');
+        setTinCertificateFileType('');
+        setTinCertificateFileDataUrl('');
+        if (tinCertificateInputRef.current) {
+          tinCertificateInputRef.current.value = '';
+        }
+      })
+      .catch(err => {
+        setError(err?.message || 'Unable to send TIN certificate email.');
+      })
+      .finally(() => setSendingTinCertificate(false));
+  };
+
   const handleDocumentVerification = (documentKey: string, verificationStatus: DocumentVerificationStatus) => {
     if (!selectedSubmission) {
       return;
@@ -669,6 +788,7 @@ const AdminDashboardPage: React.FC = () => {
       { label: 'Status', value: selectedTinApplication.status },
       { label: 'Assigned TIN', value: display(selectedTinApplication.assignedTin) },
       { label: 'Payment', value: selectedTinApplication.paymentStatus },
+      { label: 'Payment Reference', value: display(selectedTinApplication.paymentReference) },
       { label: 'Requested At', value: formatDate(selectedTinApplication.requestedAt) },
       { label: 'Assigned At', value: formatDate(selectedTinApplication.assignedAt) },
       { label: 'Last Updated', value: formatDate(selectedTinApplication.updatedAt) },
@@ -728,7 +848,7 @@ const AdminDashboardPage: React.FC = () => {
                   className={`admin-rail__item${activeView === 'tin' ? ' active' : ''}`}
                   onClick={() => setActiveView('tin')}
                 >
-                  <IdCard size={15} /> TIN Applications
+                  <IdCard size={15} /> TIN Certificates
                 </button>
               </div>
 
@@ -745,14 +865,14 @@ const AdminDashboardPage: React.FC = () => {
                       ? 'User Registry Desk'
                       : activeView === 'm1'
                         ? 'M1 Filing Desk'
-                        : 'TIN Applications Desk'}
+                        : 'TIN Certificates Desk'}
                   </p>
                   <h1>
                     {activeView === 'users'
                       ? 'Registered Users & Requested Services'
                       : activeView === 'm1'
                         ? 'M1 Tax File Users & Submissions'
-                        : 'TIN Applications & Manual TIN Assignment'}
+                        : 'Paid TIN Certificate Requests & Delivery'}
                   </h1>
                 </div>
 
@@ -1064,21 +1184,25 @@ const AdminDashboardPage: React.FC = () => {
                   <>
                     <section className="admin-card">
                       <div className="admin-card__head">
-                        <h3>TIN Applications</h3>
+                        <h3>TIN Certificate Requests (Paid)</h3>
                         <strong>{filteredTinApplications.length} shown</strong>
                       </div>
 
                       <div className="input-wrapper admin-search" style={{ marginBottom: '12px' }}>
                         <Search size={14} className="input-icon" />
                         <input
-                          placeholder="Search by NIC, name, mobile, email or TIN"
+                          placeholder="Search by NIC, name, mobile, email, TIN or payment reference"
                           value={tinQuery}
                           onChange={e => setTinQuery(e.target.value)}
                         />
                       </div>
 
+                      <p className="admin-empty" style={{ marginBottom: '10px' }}>
+                        Showing paid requests only.
+                      </p>
+
                       {!filteredTinApplications.length ? (
-                        <p className="admin-empty">No TIN applications found.</p>
+                        <p className="admin-empty">No paid TIN certificate requests found.</p>
                       ) : (
                         <div className="admin-record-list">
                           {filteredTinApplications.map(record => {
@@ -1093,6 +1217,7 @@ const AdminDashboardPage: React.FC = () => {
                                 <div className="admin-record-item__name">{display(record.fullName || 'Unknown')}</div>
                                 <div className="admin-record-item__meta">{display(record.nic)}</div>
                                 <div className="admin-record-item__meta">{display(record.mobileNo)}</div>
+                                <div className="admin-record-item__meta">Payment: {display(record.paymentReference)}</div>
                                 <div className="admin-record-item__chips">
                                   <span className={tinStatusClass(record.status)}>{record.status}</span>
                                   <span className={tinPaymentClass(record.paymentStatus)}>{record.paymentStatus}</span>
@@ -1106,12 +1231,12 @@ const AdminDashboardPage: React.FC = () => {
 
                     <section className="admin-card">
                       <div className="admin-card__head">
-                        <h3>TIN Application Details</h3>
+                        <h3>TIN Certificate Request Details</h3>
                         <strong>{selectedTinApplication ? 'Active' : 'No selection'}</strong>
                       </div>
 
                       {!selectedTinApplication ? (
-                        <p className="admin-empty">Select a TIN application to view details.</p>
+                        <p className="admin-empty">Select a paid TIN request to view details.</p>
                       ) : (
                         <div className="admin-stack">
                           <div className="admin-detail-grid">
@@ -1137,6 +1262,27 @@ const AdminDashboardPage: React.FC = () => {
                             <button className="btn-outline" onClick={handleAssignTinNumber} disabled={assigningTin}>
                               {assigningTin ? <span className="spinner" /> : <CheckCircle2 size={14} style={{ marginRight: 6 }} />}
                               Assign TIN Number
+                            </button>
+                          </div>
+
+                          <p className="admin-section-label">Upload Certificate & Send To User Email</p>
+                          <div className="admin-stack" style={{ gap: '10px' }}>
+                            <input
+                              ref={tinCertificateInputRef}
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg,.webp"
+                              onChange={handleTinCertificateFileChange}
+                            />
+                            <p className="admin-empty">
+                              {tinCertificateFileName ? `Selected file: ${tinCertificateFileName}` : 'No certificate file selected.'}
+                            </p>
+                            <button
+                              className="btn-primary"
+                              onClick={handleSendTinCertificate}
+                              disabled={sendingTinCertificate || !tinCertificateFileDataUrl}
+                            >
+                              {sendingTinCertificate ? <span className="spinner" /> : <Upload size={14} style={{ marginRight: 6 }} />}
+                              Upload And Send Certificate
                             </button>
                           </div>
                         </div>
@@ -1314,7 +1460,7 @@ const AdminDashboardPage: React.FC = () => {
                 <>
                   <section className="admin-card admin-card--compact">
                     <div className="admin-card__head">
-                      <h3>TIN Assignment Health</h3>
+                      <h3>TIN Certificate Queue Health</h3>
                       <strong>{tinMetrics.total}</strong>
                     </div>
 
@@ -1340,7 +1486,7 @@ const AdminDashboardPage: React.FC = () => {
 
                   <section className="admin-card admin-card--compact">
                     <div className="admin-card__head">
-                      <h3>Selected NIC Snapshot</h3>
+                      <h3>Selected Request Snapshot</h3>
                       <strong>{selectedTinApplication ? 'Active' : '-'}</strong>
                     </div>
 
@@ -1364,18 +1510,22 @@ const AdminDashboardPage: React.FC = () => {
                           <span>Payment</span>
                           <strong>{selectedTinApplication.paymentStatus}</strong>
                         </div>
+                        <div className="admin-detail-tile">
+                          <span>Payment Ref</span>
+                          <strong>{display(selectedTinApplication.paymentReference)}</strong>
+                        </div>
                       </div>
                     )}
                   </section>
 
                   <section className="admin-card admin-card--compact">
                     <div className="admin-card__head">
-                      <h3>Recent TIN Activity</h3>
+                      <h3>Recent Certificate Activity</h3>
                       <strong>{recentTinApplications.length}</strong>
                     </div>
 
                     {!recentTinApplications.length ? (
-                      <p className="admin-empty">No TIN application activity yet.</p>
+                      <p className="admin-empty">No TIN certificate activity yet.</p>
                     ) : (
                       <ul className="admin-activity-list">
                         {recentTinApplications.map(record => (

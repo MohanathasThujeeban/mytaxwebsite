@@ -39,8 +39,10 @@ const AppInner: React.FC = () => {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/dashboard/m1" element={<M1TaxSubmissionPage />} />
         <Route path="/dashboard/m2" element={<TinNumberStatusPage />} />
-        <Route path="/dashboard/m7" element={<TinCertificateApplicationPage />} />
-        <Route path="/dashboard/m7/payment" element={<TinApplicationPaymentPage />} />
+        <Route path="/dashboard/m6" element={<TinCertificateApplicationPage moduleCode="M6" />} />
+        <Route path="/dashboard/m6/payment" element={<TinApplicationPaymentPage moduleCode="M6" />} />
+        <Route path="/dashboard/m7" element={<TinCertificateApplicationPage moduleCode="M7" />} />
+        <Route path="/dashboard/m7/payment" element={<TinApplicationPaymentPage moduleCode="M7" />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/group" element={<GroupCompaniesPage />} />

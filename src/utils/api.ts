@@ -107,8 +107,10 @@ export const api = {
   adminUsers: (token: string) =>
     requestGet<{ users: Record<string, unknown>[] }>("/admin/users", token),
 
-  adminTinApplications: (token: string) =>
-    requestGet<{ applications: Record<string, unknown>[] }>("/admin/tin-applications", token),
+  adminTinApplications: (token: string, options?: { paidOnly?: boolean }) => {
+    const query = options?.paidOnly ? "?paidOnly=true" : "";
+    return requestGet<{ applications: Record<string, unknown>[] }>(`/admin/tin-applications${query}`, token);
+  },
 
   adminAssignTin: (token: string, applicationId: string, assignedTin: string) =>
     requestAuthed<{ message: string; application: Record<string, unknown> }>(
@@ -118,13 +120,40 @@ export const api = {
       token,
     ),
 
+  adminSendTinCertificate: (
+    token: string,
+    applicationId: string,
+    payload: {
+      tinNumber?: string;
+      fileName: string;
+      fileType?: string;
+      fileDataUrl: string;
+    },
+  ) =>
+    requestAuthed<{
+      message: string;
+      application: Record<string, unknown>;
+      delivery: {
+        sentTo: string;
+        sentAt: string;
+        fileName: string;
+        tinNumber: string;
+        paymentReference: string | null;
+      };
+    }>(
+      `/admin/tin-applications/${encodeURIComponent(applicationId)}/send-certificate`,
+      "POST",
+      payload,
+      token,
+    ),
+
   m7Latest: (token: string) =>
     requestGet<{ application: Record<string, unknown> | null }>("/m7/latest", token),
 
   m7SaveDraft: (token: string, payload: { application?: Record<string, unknown> }) =>
     requestAuthed<{ message: string; application: Record<string, unknown> }>("/m7/draft", "POST", payload, token),
 
-  m7Submit: (token: string, payload: { application?: Record<string, unknown> }) =>
+  m7Submit: (token: string, payload: { application?: Record<string, unknown>; payment?: Record<string, unknown> }) =>
     requestAuthed<{ message: string; application: Record<string, unknown> }>("/m7/submit", "POST", payload, token),
 
   m2TinStatus: (token: string, nic: string) =>

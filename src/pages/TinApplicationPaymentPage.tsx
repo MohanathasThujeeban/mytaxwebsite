@@ -41,7 +41,21 @@ const formatExpiryInput = (value: string): string => {
   return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 };
 
-const TinApplicationPaymentPage: React.FC = () => {
+type TinModuleCode = 'M6' | 'M7';
+
+interface TinApplicationPaymentPageProps {
+  moduleCode?: TinModuleCode;
+}
+
+const generatePaymentReference = (applicationId?: string, moduleCode: TinModuleCode = 'M7'): string => {
+  const fallbackPrefix = moduleCode === 'M6' ? 'M6REQ' : 'M7REQ';
+  const normalizedId = (applicationId || fallbackPrefix).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  const prefix = (normalizedId.slice(0, 8) || fallbackPrefix).padEnd(8, 'X');
+  const tail = String(Date.now()).slice(-8).padStart(8, '0');
+  return `PAY-${prefix}-${tail}`;
+};
+
+const TinApplicationPaymentPage: React.FC<TinApplicationPaymentPageProps> = ({ moduleCode = 'M7' }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -54,6 +68,10 @@ const TinApplicationPaymentPage: React.FC = () => {
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paidAt, setPaidAt] = useState('');
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
 
@@ -61,6 +79,15 @@ const TinApplicationPaymentPage: React.FC = () => {
     setSnack(message);
     window.setTimeout(() => setSnack(''), 2600);
   };
+
+  const moduleRouteBase = moduleCode === 'M6' ? '/dashboard/m6' : '/dashboard/m7';
+  const moduleEyebrow = `${moduleCode} PAYMENT SCREEN (PLACEHOLDER)`;
+  const moduleDescription =
+    moduleCode === 'M6'
+      ? 'This is an interactive payment screen for M6 TIN Certificate Request. Final API integration can be plugged in later.'
+      : 'This is an interactive payment screen for now. Final API integration can be plugged in later.';
+  const moduleServiceLabel =
+    moduleCode === 'M6' ? 'M6 - TIN Certificate Request' : 'M7 - TIN Certificate Application';
 
   const canPay = useMemo(() => {
     const cardDigits = cardNumber.replace(/\D/g, '');
@@ -98,40 +125,68 @@ const TinApplicationPaymentPage: React.FC = () => {
     }
 
     setError('');
-
     setProcessing(true);
 
     window.setTimeout(() => {
-      api.m7Submit(token, {
-        application: {
-          nic: routeState.application?.nic || routeState.nic || user.nic,
-          fullName: routeState.application?.fullName || user.fullName || '',
-          mobileNo: routeState.application?.mobileNo || user.contactNo || '',
-          emailAddress: routeState.application?.emailAddress || user.mailAddress || '',
-        },
+      const generatedReference = generatePaymentReference(routeState.applicationId, moduleCode);
+      setPaymentReference(generatedReference);
+      setPaidAt(new Date().toISOString());
+      setPaid(true);
+      setProcessing(false);
+      showSnack('Payment successful. Click Request My Certificate to complete submission.');
+    }, 850);
+  };
+
+  const handleRequestCertificate = () => {
+    if (!paid) {
+      showSnack('Complete payment first.');
+      return;
+    }
+
+    const token = sessionStorage.getItem(USER_TOKEN_KEY);
+    if (!token) {
+      setError('Session expired. Please login again.');
+      return;
+    }
+
+    setRequesting(true);
+    setError('');
+
+    api.m7Submit(token, {
+      application: {
+        nic: routeState.application?.nic || routeState.nic || user.nic,
+        fullName: routeState.application?.fullName || user.fullName || '',
+        mobileNo: routeState.application?.mobileNo || user.contactNo || '',
+        emailAddress: routeState.application?.emailAddress || user.mailAddress || '',
+      },
+      payment: {
+        paymentReference,
+        method: brand === 'visa' ? 'VISA' : 'MASTERCARD',
+        amount: 1500,
+        currency: 'LKR',
+        paidAt,
+      },
+    })
+      .then(() => {
+        const requestKind = moduleCode === 'M6' ? 'Certificate request submitted' : 'TIN request submitted';
+        showSnack(`${requestKind}. Payment ID: ${paymentReference}`);
+        navigate(moduleRouteBase, { replace: true });
       })
-        .then(() => {
-          showSnack('Payment successful. TIN request submitted.');
-          navigate('/dashboard/modules', { replace: true });
-        })
-        .catch(err => {
-          setError(err?.message || 'Payment completed but failed to submit TIN request. Please try again.');
-        })
-        .finally(() => setProcessing(false));
-    }, 900);
+      .catch(err => {
+        setError(err?.message || 'Unable to submit your request after payment. Please try again.');
+      })
+      .finally(() => setRequesting(false));
   };
 
   return (
     <div className="dashboard">
       <div className="dashboard-header">
         <div className="m1-header-copy">
-          <p className="m1-eyebrow">PAYMENT SCREEN (PLACEHOLDER)</p>
+          <p className="m1-eyebrow">{moduleEyebrow}</p>
           <h1>
             <CreditCard size={22} /> Visa / MasterCard Payment
           </h1>
-          <p>
-            This is an interactive payment screen for now. Final API integration can be plugged in later.
-          </p>
+          <p>{moduleDescription}</p>
         </div>
         <img
           src="/images/logo.png"
@@ -218,12 +273,16 @@ const TinApplicationPaymentPage: React.FC = () => {
             </div>
 
             <div className="m1-nav-row" style={{ marginTop: '16px' }}>
-              <button type="button" className="btn-outline" onClick={() => navigate('/dashboard/m7')}>
+              <button type="button" className="btn-outline" onClick={() => navigate(moduleRouteBase)}>
                 <ArrowLeft size={14} style={{ marginRight: 6 }} /> Back to Application
               </button>
-              <button type="button" className="btn-primary" onClick={handlePayNow} disabled={processing || !canPay}>
+              <button type="button" className="btn-outline" onClick={handlePayNow} disabled={processing || !canPay || paid}>
                 {processing ? <span className="spinner" /> : <CheckCircle2 size={14} style={{ marginRight: 6 }} />}
-                Pay Now
+                {paid ? 'Payment Completed' : 'Pay Now'}
+              </button>
+              <button type="button" className="btn-primary" onClick={handleRequestCertificate} disabled={!paid || requesting}>
+                {requesting ? <span className="spinner" /> : <CheckCircle2 size={14} style={{ marginRight: 6 }} />}
+                Request My Certificate
               </button>
             </div>
           </section>
@@ -250,16 +309,26 @@ const TinApplicationPaymentPage: React.FC = () => {
               </div>
               <div className="admin-detail-tile">
                 <span>Service</span>
-                <strong>M7 - TIN Certificate Application</strong>
+                <strong>{moduleServiceLabel}</strong>
+              </div>
+              <div className="admin-detail-tile">
+                <span>Payment ID</span>
+                <strong>{paymentReference || '-'}</strong>
               </div>
               <div className="admin-detail-tile">
                 <span>Amount</span>
                 <strong>LKR 1,500.00</strong>
               </div>
+              <div className="admin-detail-tile">
+                <span>Paid At</span>
+                <strong>{paidAt ? new Date(paidAt).toLocaleString() : '-'}</strong>
+              </div>
             </div>
 
             <p className="admin-empty" style={{ marginTop: '12px' }}>
-              TIN request is submitted only after successful payment on this screen.
+              {paid
+                ? 'Payment is marked successful. Click Request My Certificate to submit this paid request.'
+                : 'Complete payment first, then click Request My Certificate to submit your request.'}
             </p>
           </section>
         </div>

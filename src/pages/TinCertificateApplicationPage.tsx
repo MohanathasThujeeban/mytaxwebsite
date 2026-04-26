@@ -15,6 +15,7 @@ interface TinApplicationDto {
   emailAddress: string;
   assignedTin: string | null;
   paymentStatus: 'pending' | 'completed';
+  paymentReference: string | null;
   requestedAt: string | null;
   assignedAt: string | null;
   createdAt: string;
@@ -61,6 +62,7 @@ const toTinApplication = (raw: Record<string, unknown>): TinApplicationDto => ({
   emailAddress: asString(raw.emailAddress),
   assignedTin: asString(raw.assignedTin) || null,
   paymentStatus: asString(raw.paymentStatus).toLowerCase() === 'completed' ? 'completed' : 'pending',
+  paymentReference: asString(raw.paymentReference) || null,
   requestedAt: asString(raw.requestedAt) || null,
   assignedAt: asString(raw.assignedAt) || null,
   createdAt: asString(raw.createdAt),
@@ -97,7 +99,13 @@ const statusClass = (status: TinApplicationStatus): string => {
 const paymentClass = (status: 'pending' | 'completed'): string =>
   status === 'completed' ? 'm1-status-chip success' : 'm1-status-chip warning';
 
-const TinCertificateApplicationPage: React.FC = () => {
+type TinModuleCode = 'M6' | 'M7';
+
+interface TinCertificateApplicationPageProps {
+  moduleCode?: TinModuleCode;
+}
+
+const TinCertificateApplicationPage: React.FC<TinCertificateApplicationPageProps> = ({ moduleCode = 'M7' }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -118,6 +126,24 @@ const TinCertificateApplicationPage: React.FC = () => {
     setSnack(message);
     window.setTimeout(() => setSnack(''), 3200);
   };
+
+  const moduleRouteBase = moduleCode === 'M6' ? '/dashboard/m6' : '/dashboard/m7';
+  const moduleEyebrow = moduleCode === 'M6' ? 'M6 TIN CERTIFICATE REQUEST' : 'M7 TIN CERTIFICATE APPLICATION';
+  const moduleHeading = moduleCode === 'M6' ? 'Request Your TIN Certificate' : 'Request Your TIN Number';
+  const moduleIntro =
+    moduleCode === 'M6'
+      ? 'Your NIC is already linked to this account. Confirm the required fields and continue to payment for your certificate request.'
+      : 'Your NIC is already linked to this account. Confirm the 4 required fields and continue to payment.';
+  const moduleDraftSavedMessage =
+    moduleCode === 'M6' ? 'TIN certificate request draft saved.' : 'TIN application draft saved.';
+  const modulePreparePaymentMessage =
+    moduleCode === 'M6'
+      ? 'Draft saved. Continue to payment to submit your certificate request.'
+      : 'Draft saved. Continue to payment to submit your TIN request.';
+  const modulePreparePaymentError =
+    moduleCode === 'M6'
+      ? 'Unable to prepare payment for certificate request.'
+      : 'Unable to prepare payment for TIN request.';
 
   useEffect(() => {
     if (!user) {
@@ -209,7 +235,7 @@ const TinCertificateApplicationPage: React.FC = () => {
       .then(res => {
         const next = toTinApplication(res.application);
         setApplication(next);
-        showSnack('TIN application draft saved.');
+        showSnack(moduleDraftSavedMessage);
       })
       .catch(err => {
         setError(err?.message || 'Unable to save draft.');
@@ -245,8 +271,8 @@ const TinCertificateApplicationPage: React.FC = () => {
       .then(res => {
         const next = toTinApplication(res.application);
         setApplication(next);
-        showSnack('Draft saved. Continue to payment to submit your TIN request.');
-        navigate('/dashboard/m7/payment', {
+        showSnack(modulePreparePaymentMessage);
+        navigate(`${moduleRouteBase}/payment`, {
           state: {
             applicationId: next.id,
             nic: next.nic,
@@ -255,7 +281,7 @@ const TinCertificateApplicationPage: React.FC = () => {
         });
       })
       .catch(err => {
-        setError(err?.message || 'Unable to prepare payment for TIN request.');
+        setError(err?.message || modulePreparePaymentError);
       })
       .finally(() => setSubmitting(false));
   };
@@ -268,13 +294,11 @@ const TinCertificateApplicationPage: React.FC = () => {
     <div className="dashboard">
       <div className="dashboard-header">
         <div className="m1-header-copy">
-          <p className="m1-eyebrow">M7 TIN CERTIFICATE APPLICATION</p>
+          <p className="m1-eyebrow">{moduleEyebrow}</p>
           <h1>
-            <BadgeCheck size={22} /> Request Your TIN Number
+            <BadgeCheck size={22} /> {moduleHeading}
           </h1>
-          <p>
-            Your NIC is already linked to this account. Confirm the 4 required fields and continue to payment.
-          </p>
+          <p>{moduleIntro}</p>
         </div>
         <img
           src="/images/logo.png"
@@ -389,6 +413,10 @@ const TinCertificateApplicationPage: React.FC = () => {
                   </strong>
                 </div>
                 <div className="admin-detail-tile">
+                  <span>Payment Reference</span>
+                  <strong>{application?.paymentReference || '-'}</strong>
+                </div>
+                <div className="admin-detail-tile">
                   <span>Assigned TIN Number</span>
                   <strong>{application?.assignedTin || '-'}</strong>
                 </div>
@@ -404,7 +432,9 @@ const TinCertificateApplicationPage: React.FC = () => {
 
               {application?.status === 'submitted' && (
                 <p className="admin-empty" style={{ marginTop: '12px' }}>
-                  Request submitted after successful payment and currently in processing.
+                  {moduleCode === 'M6'
+                    ? 'Certificate request submitted after successful payment and currently in processing.'
+                    : 'Request submitted after successful payment and currently in processing.'}
                 </p>
               )}
 
@@ -419,7 +449,7 @@ const TinCertificateApplicationPage: React.FC = () => {
                   type="button"
                   className="btn-outline"
                   onClick={() =>
-                    navigate('/dashboard/m7/payment', {
+                    navigate(`${moduleRouteBase}/payment`, {
                       state: {
                         applicationId: application?.id || '',
                         nic: form.nic,
@@ -428,7 +458,7 @@ const TinCertificateApplicationPage: React.FC = () => {
                     })
                   }
                 >
-                  <ArrowRight size={14} style={{ marginRight: 6 }} /> Open Payment Screen
+                  <ArrowRight size={14} style={{ marginRight: 6 }} /> Open {moduleCode} Payment Screen
                 </button>
               </div>
             </section>

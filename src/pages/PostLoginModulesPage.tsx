@@ -50,6 +50,11 @@ const PostLoginModulesPage: React.FC = () => {
       return;
     }
 
+    if (code === 'M6') {
+      navigate('/dashboard/m6');
+      return;
+    }
+
     if (code === 'M7') {
       navigate('/dashboard/m7');
       return;
