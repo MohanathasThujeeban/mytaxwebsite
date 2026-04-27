@@ -152,7 +152,8 @@ const TinApplicationPaymentPage: React.FC<TinApplicationPaymentPageProps> = ({ m
     setRequesting(true);
     setError('');
 
-    api.m7Submit(token, {
+    const submitRequest = moduleCode === 'M6' ? api.m6Submit : api.m7Submit;
+    submitRequest(token, {
       application: {
         nic: routeState.application?.nic || routeState.nic || user.nic,
         fullName: routeState.application?.fullName || user.fullName || '',

@@ -226,7 +226,7 @@ const AdminDashboardPage: React.FC = () => {
         }
       });
 
-    const tinPromise = api.adminTinApplications(token, { paidOnly: true })
+    const tinPromise = api.adminTinApplications(token, { paidOnly: true, moduleCode: 'M6' })
       .then(res => {
         const list = Array.isArray(res.applications) ? res.applications.map(item => toTinApplication(item)) : [];
         setTinApplications(list);

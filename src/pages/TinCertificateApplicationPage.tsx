@@ -165,7 +165,8 @@ const TinCertificateApplicationPage: React.FC<TinCertificateApplicationPageProps
       return;
     }
 
-    api.m7Latest(token)
+    const loadLatest = moduleCode === 'M6' ? api.m6Latest : api.m7Latest;
+    loadLatest(token)
       .then(res => {
         if (!res.application) {
           return;
@@ -224,7 +225,8 @@ const TinCertificateApplicationPage: React.FC<TinCertificateApplicationPageProps
     setSaving(true);
     setError('');
 
-    api.m7SaveDraft(token, {
+    const saveDraftRequest = moduleCode === 'M6' ? api.m6SaveDraft : api.m7SaveDraft;
+    saveDraftRequest(token, {
       application: {
         nic: form.nic,
         fullName: form.fullName,
@@ -265,7 +267,8 @@ const TinCertificateApplicationPage: React.FC<TinCertificateApplicationPageProps
 
     const payload = buildSubmitPayload();
 
-    api.m7SaveDraft(token, {
+    const saveDraftRequest = moduleCode === 'M6' ? api.m6SaveDraft : api.m7SaveDraft;
+    saveDraftRequest(token, {
       application: payload,
     })
       .then(res => {

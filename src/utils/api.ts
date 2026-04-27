@@ -107,8 +107,15 @@ export const api = {
   adminUsers: (token: string) =>
     requestGet<{ users: Record<string, unknown>[] }>("/admin/users", token),
 
-  adminTinApplications: (token: string, options?: { paidOnly?: boolean }) => {
-    const query = options?.paidOnly ? "?paidOnly=true" : "";
+  adminTinApplications: (token: string, options?: { paidOnly?: boolean; moduleCode?: 'M6' | 'M7' }) => {
+    const params = new URLSearchParams();
+    if (options?.paidOnly) {
+      params.set('paidOnly', 'true');
+    }
+    if (options?.moduleCode) {
+      params.set('moduleCode', options.moduleCode);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
     return requestGet<{ applications: Record<string, unknown>[] }>(`/admin/tin-applications${query}`, token);
   },
 
@@ -155,6 +162,15 @@ export const api = {
 
   m7Submit: (token: string, payload: { application?: Record<string, unknown>; payment?: Record<string, unknown> }) =>
     requestAuthed<{ message: string; application: Record<string, unknown> }>("/m7/submit", "POST", payload, token),
+
+  m6Latest: (token: string) =>
+    requestGet<{ application: Record<string, unknown> | null }>("/m6/latest", token),
+
+  m6SaveDraft: (token: string, payload: { application?: Record<string, unknown> }) =>
+    requestAuthed<{ message: string; application: Record<string, unknown> }>("/m6/draft", "POST", payload, token),
+
+  m6Submit: (token: string, payload: { application?: Record<string, unknown>; payment?: Record<string, unknown> }) =>
+    requestAuthed<{ message: string; application: Record<string, unknown> }>("/m6/submit", "POST", payload, token),
 
   m2TinStatus: (token: string, nic: string) =>
     requestGet<{ tinStatus: Record<string, unknown> }>(`/m2/status?nic=${encodeURIComponent(nic)}`, token),
