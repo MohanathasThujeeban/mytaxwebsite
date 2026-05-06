@@ -121,6 +121,7 @@ const VerifyPage: React.FC = () => {
     api.verifyOtp({
       nic: trimmedNic,
       email: method === 'email' ? trimmedEmail : undefined,
+      phone: method === 'phone' ? trimmedMobile : undefined,
       code: otpStr,
     })
       .then(res => {
